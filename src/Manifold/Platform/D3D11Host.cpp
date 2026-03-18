@@ -1,4 +1,4 @@
-#include "D3D11Host.h"
+#include "D3D11Host.hpp"
 
 #pragma comment(lib, "d3d11.lib")
 

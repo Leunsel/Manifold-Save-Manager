@@ -1,9 +1,9 @@
-#include "SaveManager.h"
+#include "SaveManager.hpp"
 
 #include <algorithm>
 #include <fstream>
 
-#include "Utils.h"
+#include "Utils.hpp"
 
 namespace manifold
 {

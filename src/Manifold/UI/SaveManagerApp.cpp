@@ -1,12 +1,12 @@
-#include "SaveManagerApp.h"
+#include "SaveManagerApp.hpp"
 
-#include "../Core/Math.h"
-#include "../Core/SaveManager.h"
+#include "../Core/Math.hpp"
+#include "../Core/SaveManager.hpp"
 
 #include <algorithm>
 
-#include "Theme.h"
-#include "../Core/Utils.h"
+#include "Theme.hpp"
+#include "../Core/Utils.hpp"
 #include "../../ImGui/imgui.h"
 #include "../../ImGui/imgui_internal.h"
 

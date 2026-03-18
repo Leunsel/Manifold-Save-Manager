@@ -162,9 +162,6 @@
     <ClInclude Include="Manifold\UI\SaveManagerApp.h" />
     <ClInclude Include="Manifold\UI\Theme.h" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include=".gitignore" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

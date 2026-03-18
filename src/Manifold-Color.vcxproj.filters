@@ -80,25 +80,25 @@
     <ClInclude Include="ImGui\imstb_truetype.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="Manifold\Platform\D3D11Host.h">
+    <ClInclude Include="Manifold\Platform\D3D11Host.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="Manifold\UI\SaveManagerApp.h">
+    <ClInclude Include="Manifold\UI\SaveManagerApp.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="Manifold\UI\Theme.h">
+    <ClInclude Include="Manifold\UI\Theme.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="Manifold\Core\Models.h">
+    <ClInclude Include="Manifold\Core\Models.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="Manifold\Core\SaveManager.h">
+    <ClInclude Include="Manifold\Core\SaveManager.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="Manifold\Core\Utils.h">
+    <ClInclude Include="Manifold\Core\Utils.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="Manifold\Core\Math.h">
+    <ClInclude Include="Manifold\Core\Math.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

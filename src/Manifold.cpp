@@ -5,8 +5,8 @@
 #include "ImGui/imgui_impl_dx11.h"
 #include "ImGui/imgui_impl_win32.h"
 
-#include "Manifold/Platform/D3D11Host.h"
-#include "Manifold/UI/SaveManagerApp.h"
+#include "Manifold/Platform/D3D11Host.hpp"
+#include "Manifold/UI/SaveManagerApp.hpp"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 

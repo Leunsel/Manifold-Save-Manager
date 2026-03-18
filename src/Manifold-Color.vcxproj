@@ -154,13 +154,13 @@
     <ClInclude Include="ImGui\imstb_rectpack.h" />
     <ClInclude Include="ImGui\imstb_textedit.h" />
     <ClInclude Include="ImGui\imstb_truetype.h" />
-    <ClInclude Include="Manifold\Core\Math.h" />
-    <ClInclude Include="Manifold\Core\Models.h" />
-    <ClInclude Include="Manifold\Core\SaveManager.h" />
-    <ClInclude Include="Manifold\Core\Utils.h" />
-    <ClInclude Include="Manifold\Platform\D3D11Host.h" />
-    <ClInclude Include="Manifold\UI\SaveManagerApp.h" />
-    <ClInclude Include="Manifold\UI\Theme.h" />
+    <ClInclude Include="Manifold\Core\Math.hpp" />
+    <ClInclude Include="Manifold\Core\Models.hpp" />
+    <ClInclude Include="Manifold\Core\SaveManager.hpp" />
+    <ClInclude Include="Manifold\Core\Utils.hpp" />
+    <ClInclude Include="Manifold\Platform\D3D11Host.hpp" />
+    <ClInclude Include="Manifold\UI\SaveManagerApp.hpp" />
+    <ClInclude Include="Manifold\UI\Theme.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

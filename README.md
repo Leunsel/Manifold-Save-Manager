@@ -42,6 +42,26 @@ The main goals of this project are:
 - support multiple games and profiles
 - provide a modular codebase that is easy to extend
 
+## Roadmap
+
+### Near term
+- Finish the current refactor and reduce UI/state coupling
+- Clean up helper ownership and shared utility functions
+- Improve build stability and remove migration leftovers
+- Stabilize backup creation, deletion, refresh, and restore flows
+
+### Mid term
+- Improve the docked UI workflow and window layout
+- Add filtering, sorting, and better navigation for games, profiles, and backups
+- Refine scope rule editing and backup detail previews
+- Add stronger validation and safer destructive actions
+
+### Longer term
+- Add import/export for game and profile configurations
+- Add backup retention policies and workflow presets
+- Improve documentation, screenshots, and onboarding
+- Prepare the first stable public release
+
 ## Tech Stack
 
 This project currently uses:

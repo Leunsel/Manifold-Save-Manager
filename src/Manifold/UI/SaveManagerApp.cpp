@@ -198,7 +198,7 @@ namespace manifold
 
         ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground |
-            ImGuiWindowFlags_MenuBar;
+            ImGuiWindowFlags_MenuBar
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -1017,7 +1017,7 @@ namespace manifold
         const float closeWidth = 120.0f;
 
         if (ImGui::Button("GitHub##Tool", ImVec2(closeWidth, 0.0f)))
-            OpenUrl("https://github.com/your-org/your-repo");
+            OpenUrl("https://github.com/Leunsel/Manifold-Save-Manager");
 
         ImGui::SameLine();
 

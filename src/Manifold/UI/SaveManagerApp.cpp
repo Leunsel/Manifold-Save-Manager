@@ -14,6 +14,9 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include "../Font/IconsFontAwesome5.hpp"
+#include "../Font/Manifold-Font.hpp"
+
 #include "../../Imgui/imgui.h"
 #include "../../ImGui/imgui_internal.h"
 
@@ -86,6 +89,11 @@ namespace manifold
         bool OpenGameModal = false;
         bool OpenRestoreModal = false;
 
+        bool OpenDeleteGamePopup = false;
+        bool OpenDeleteProfilePopup = false;
+        char GameFilter[128]{};
+        char BackupFilter[128]{};
+
         int ProfileModalMode = 0;
         int GameModalMode = 0;
 
@@ -103,6 +111,7 @@ namespace manifold
         void DrawMainMenuBar();
 
         void DrawNavigatorWindow();
+        void DrawDeleteGamePopup();
         void DrawProfilesWindow();
         void DrawProfileListPane(GameDefinition& game);
         void DrawProfileEditorPane();
@@ -134,6 +143,8 @@ namespace manifold
         void ClearGameEditor();
         void ClearProfileEditor();
 
+        void LoadManifoldFonts();
+
         void AddLog(std::string message, ImVec4 color);
 
         static ImVec4 Good();
@@ -144,7 +155,12 @@ namespace manifold
 
     SaveManagerApp::SaveManagerApp(HWND hwnd) : m_Impl(std::make_unique<Impl>(hwnd))
     {
+        m_Impl->LoadManifoldFonts();
         ApplyManifoldTheme();
+
+        m_Impl->SaveManager.Load();
+        m_Impl->LoadSelectedIntoEditor();
+        m_Impl->AddLog("SaveManager state loaded.", Impl::Accent());
     }
 
     SaveManagerApp::~SaveManagerApp() = default;
@@ -224,6 +240,8 @@ namespace manifold
         DrawProfileModal();
         DrawRestoreModal();
         DrawAboutPopup();
+        DrawDeleteGamePopup();
+        DrawDeleteBackupPopup();
     }
 
     void SaveManagerApp::Impl::InitializeDefaultDockLayout(ImGuiID dockspaceId)
@@ -257,67 +275,86 @@ namespace manifold
     {
         if (!ImGui::BeginMenuBar()) return;
 
-        if (ImGui::BeginMenu("File"))
+        if (ImGui::BeginMenu(ICON_FA_FILE_ALT " File"))
         {
-            if (ImGui::MenuItem("Save Config"))
+            if (ImGui::MenuItem(ICON_FA_SAVE " Save Config"))
             {
                 SaveEditorIntoSelected();
                 const bool ok = SaveManager.SaveConfig();
                 AddLog(ok ? "Configuration saved." : "Configuration could not be saved.", ok ? Good() : Bad());
             }
-            if (ImGui::MenuItem("Refresh"))
+
+            if (ImGui::MenuItem(ICON_FA_SYNC " Refresh"))
             {
-                SaveManager.RefreshBackups();
-                AddLog("Backup list refreshed.", Accent());
+                SaveEditorIntoSelected();
+                SaveManager.Load();
+                LoadSelectedIntoEditor();
+                AddLog("Configuration and backups refreshed.", Accent());
             }
+
             ImGui::Separator();
-            if (ImGui::MenuItem("Exit")) PostMessage(MainWindow, WM_CLOSE, 0, 0);
+
+            if (ImGui::MenuItem(ICON_FA_SIGN_OUT_ALT " Exit"))
+                PostMessage(MainWindow, WM_CLOSE, 0, 0);
+
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Game"))
+        if (ImGui::BeginMenu(ICON_FA_GAMEPAD " Game"))
         {
-            if (ImGui::MenuItem("Add Game")) OpenCreateGameModal();
-            if (ImGui::MenuItem("Edit Game", nullptr, false, SaveManager.CurrentGame() != nullptr)) OpenEditGameModal();
+            if (ImGui::MenuItem(ICON_FA_PLUS " Add Game"))
+                OpenCreateGameModal();
+
+            if (ImGui::MenuItem(ICON_FA_EDIT " Edit Game", nullptr, false, SaveManager.CurrentGame() != nullptr))
+                OpenEditGameModal();
+
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Profile"))
+        if (ImGui::BeginMenu(ICON_FA_USERS " Profile"))
         {
-            if (ImGui::MenuItem("Add Profile", nullptr, false, SaveManager.CurrentGame() != nullptr)) OpenCreateProfileModal();
-            if (ImGui::MenuItem("Edit Profile", nullptr, false, SaveManager.CurrentProfile() != nullptr)) OpenEditProfileModal();
-            if (ImGui::MenuItem("Instant Switch", nullptr, false, SaveManager.CurrentGame() != nullptr)) ExecuteInstantProfileSwitch();
+            if (ImGui::MenuItem(ICON_FA_PLUS " Add Profile", nullptr, false, SaveManager.CurrentGame() != nullptr))
+                OpenCreateProfileModal();
+
+            if (ImGui::MenuItem(ICON_FA_EDIT " Edit Profile", nullptr, false, SaveManager.CurrentProfile() != nullptr))
+                OpenEditProfileModal();
+
+            if (ImGui::MenuItem(ICON_FA_EXCHANGE_ALT " Instant Switch", nullptr, false, SaveManager.CurrentGame() != nullptr))
+                ExecuteInstantProfileSwitch();
+
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Backup"))
+        if (ImGui::BeginMenu(ICON_FA_ARCHIVE " Backup"))
         {
-            if (ImGui::MenuItem("Create Backup", nullptr, false, SaveManager.CurrentProfile() != nullptr))
+            if (ImGui::MenuItem(ICON_FA_SAVE " Create Backup", nullptr, false, SaveManager.CurrentProfile() != nullptr))
             {
                 SaveEditorIntoSelected();
                 const auto result = SaveManager.CreateBackupForCurrentProfile("Manual backup");
                 AddLog(result.Message, result.Success ? Good() : Bad());
             }
-            if (ImGui::MenuItem("Restore Selected", nullptr, false, SaveManager.CurrentBackup() != nullptr))
+
+            if (ImGui::MenuItem(ICON_FA_UNDO " Restore Selected", nullptr, false, SaveManager.CurrentBackup() != nullptr))
                 OpenRestoreModal = true;
+
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("View"))
+        if (ImGui::BeginMenu(ICON_FA_EYE " View"))
         {
-            ImGui::MenuItem("Navigator", nullptr, &ShowNavigator);
-            ImGui::MenuItem("Profiles", nullptr, &ShowProfiles);
-            ImGui::MenuItem("Game Config", nullptr, &ShowGameConfig);
-            ImGui::MenuItem("Scope Rules", nullptr, &ShowScopeRules);
-            ImGui::MenuItem("Backups", nullptr, &ShowBackups);
-            ImGui::MenuItem("Backup Details", nullptr, &ShowBackupDetails);
-            ImGui::MenuItem("Activity Log", nullptr, &ShowActivityLog);
+            ImGui::MenuItem(ICON_FA_GAMEPAD " Navigator", nullptr, &ShowNavigator);
+            ImGui::MenuItem(ICON_FA_USERS " Profiles", nullptr, &ShowProfiles);
+            ImGui::MenuItem(ICON_FA_COG " Game Config", nullptr, &ShowGameConfig);
+            ImGui::MenuItem(ICON_FA_FILTER " Scope Rules", nullptr, &ShowScopeRules);
+            ImGui::MenuItem(ICON_FA_ARCHIVE " Backups", nullptr, &ShowBackups);
+            ImGui::MenuItem(ICON_FA_INFO_CIRCLE " Backup Details", nullptr, &ShowBackupDetails);
+            ImGui::MenuItem(ICON_FA_STREAM " Activity Log", nullptr, &ShowActivityLog);
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Help"))
+        if (ImGui::BeginMenu(ICON_FA_QUESTION_CIRCLE " Help"))
         {
-            if (ImGui::MenuItem("About"))
+            if (ImGui::MenuItem(ICON_FA_INFO_CIRCLE " About"))
                 OpenAboutPopup = true;
 
             ImGui::EndMenu();
@@ -329,56 +366,147 @@ namespace manifold
     void SaveManagerApp::Impl::DrawNavigatorWindow()
     {
         if (!ShowNavigator) return;
-        ImGui::Begin("Navigator", &ShowNavigator);
+        ImGui::Begin(ICON_FA_GAMEPAD " Navigator###Navigator", &ShowNavigator);
 
-        if (ImGui::Button("New Game", ImVec2(-1.0f, 0.0f))) OpenCreateGameModal();
+        const bool hasGame = SaveManager.CurrentGame() != nullptr;
+
+        if (ImGui::Button(ICON_FA_PLUS "##AddGame"))
+            OpenCreateGameModal();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Create game");
+
+        ImGui::SameLine();
+
+        ImGui::BeginDisabled(!hasGame);
+        if (ImGui::Button(ICON_FA_EDIT "##EditGame"))
+            OpenEditGameModal();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Edit selected game");
+
+        ImGui::SameLine();
+
+        if (ImGui::Button(ICON_FA_TRASH_ALT "##DeleteGame"))
+            OpenDeleteGamePopup = true;
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Delete selected game");
+        ImGui::EndDisabled();
+
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::InputTextWithHint("##GameFilter", ICON_FA_SEARCH " Filter games...", GameFilter, IM_ARRAYSIZE(GameFilter));
+
         ImGui::Separator();
-        ImGui::TextUnformatted("Games");
 
-        if (ImGui::BeginListBox("##GameList", ImVec2(-1.0f, 220.0f)))
+        if (ImGui::BeginListBox("##GameList", ImVec2(-1.0f, -100.0f)))
         {
             const auto& games = SaveManager.Games();
+            const std::string filter = Trim(GameFilter);
+
             for (int i = 0; i < static_cast<int>(games.size()); ++i)
             {
                 const bool selected = i == SaveManager.SelectedGame();
-                const std::string label = games[i].DisplayName.empty() ? games[i].Id : games[i].DisplayName;
-                if (ImGui::Selectable(label.c_str(), selected))
+                const std::string display = games[i].DisplayName.empty() ? games[i].Id : games[i].DisplayName;
+
+                if (!filter.empty())
+                {
+                    std::string hay = ToLowerCopy(display + " " + games[i].Id + " " + games[i].SavePath);
+                    if (hay.find(ToLowerCopy(filter)) == std::string::npos)
+                        continue;
+                }
+
+                ImGui::PushID(i);
+                if (ImGui::Selectable(display.c_str(), selected))
                 {
                     SaveEditorIntoSelected();
                     SaveManager.SetSelectedGame(i);
                     LoadSelectedIntoEditor();
                 }
+
+                if (ImGui::BeginPopupContextItem("GameContext"))
+                {
+                    if (ImGui::MenuItem(ICON_FA_EDIT " Edit"))
+                        OpenEditGameModal();
+
+                    if (ImGui::MenuItem(ICON_FA_TRASH_ALT " Delete"))
+                        OpenDeleteGamePopup = true;
+
+                    ImGui::Separator();
+
+                    if (ImGui::MenuItem(ICON_FA_ARCHIVE " Create Backup", nullptr, false, SaveManager.CurrentProfile() != nullptr))
+                    {
+                        SaveEditorIntoSelected();
+                        auto result = SaveManager.CreateBackupForCurrentProfile("Manual backup");
+                        AddLog(result.Message, result.Success ? Good() : Bad());
+                    }
+
+                    ImGui::EndPopup();
+                }
+                ImGui::PopID();
             }
+
             ImGui::EndListBox();
         }
 
         const GameDefinition* game = SaveManager.CurrentGame();
         const GameProfile* profile = SaveManager.CurrentProfile();
+
         ImGui::Separator();
-        ImGui::TextDisabled("Current Selection");
+        ImGui::TextDisabled("Selection");
         if (game)
         {
-            ImGui::Text("Game: %s", game->DisplayName.c_str());
-            ImGui::Text("Scope: %s", ToString(game->ScopeMode));
+            ImGui::TextUnformatted((game->DisplayName.empty() ? game->Id : game->DisplayName).c_str());
+            ImGui::TextDisabled("%s", game->SavePath.empty() ? "No save path configured" : game->SavePath.c_str());
         }
-        if (profile) ImGui::Text("Profile: %s", profile->Name.c_str());
+        if (profile)
+            ImGui::TextDisabled("Active Profile: %s", profile->Name.c_str());
 
-        ImGui::Separator();
-        if (ImGui::Button("Create Backup", ImVec2(-1.0f, 0.0f)))
-        {
-            SaveEditorIntoSelected();
-            auto result = SaveManager.CreateBackupForCurrentProfile("Manual backup");
-            AddLog(result.Message, result.Success ? Good() : Bad());
-        }
-        if (ImGui::Button("Switch Profile", ImVec2(-1.0f, 0.0f))) ExecuteInstantProfileSwitch();
+        DrawDeleteGamePopup();
 
         ImGui::End();
+    }
+
+    void SaveManagerApp::Impl::DrawDeleteGamePopup()
+    {
+        if (OpenDeleteGamePopup)
+        {
+            ImGui::OpenPopup("DeleteGameConfirm");
+            OpenDeleteGamePopup = false;
+        }
+
+        if (!ImGui::BeginPopupModal("DeleteGameConfirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            return;
+
+        const GameDefinition* game = SaveManager.CurrentGame();
+        if (!game)
+        {
+            ImGui::TextDisabled("No game selected.");
+        }
+        else
+        {
+            const std::string label = game->DisplayName.empty() ? game->Id : game->DisplayName;
+            ImGui::Text("Delete game '%s'?", label.c_str());
+            ImGui::TextDisabled("This removes the configuration entry from Manifold.");
+        }
+
+        ImGui::Spacing();
+
+        if (ImGui::Button(ICON_FA_TRASH_ALT " Delete", ImVec2(140.0f, 0.0f)))
+        {
+            SaveManager.RemoveCurrentGame();
+            LoadSelectedIntoEditor();
+            AddLog("Game removed.", Warn());
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button(ICON_FA_TIMES " Cancel", ImVec2(140.0f, 0.0f)))
+            ImGui::CloseCurrentPopup();
+
+        ImGui::EndPopup();
     }
 
     void SaveManagerApp::Impl::DrawProfilesWindow()
     {
         if (!ShowProfiles) return;
-        ImGui::Begin("Profiles", &ShowProfiles);
+        ImGui::Begin(ICON_FA_USERS " Profiles###Profiles", &ShowProfiles);
 
         GameDefinition* game = SaveManager.CurrentGame();
         if (!game)
@@ -403,9 +531,24 @@ namespace manifold
 
     void SaveManagerApp::Impl::DrawProfileListPane(GameDefinition& game)
     {
-        if (ImGui::Button("New Profile", ImVec2(-1.0f, 0.0f))) OpenCreateProfileModal();
-        if (ImGui::Button("Edit Selected Profile", ImVec2(-1.0f, 0.0f))) OpenEditProfileModal();
-        if (ImGui::Button("Remove Selected Profile", ImVec2(-1.0f, 0.0f)))
+        const bool hasProfile = SaveManager.CurrentProfile() != nullptr;
+        const bool canRemove = game.Profiles.size() > 1 && hasProfile;
+
+        if (ImGui::Button(ICON_FA_PLUS "##AddProfile"))
+            OpenCreateProfileModal();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Create profile");
+
+        ImGui::SameLine();
+
+        ImGui::BeginDisabled(!hasProfile);
+        if (ImGui::Button(ICON_FA_EDIT "##EditProfile"))
+            OpenEditProfileModal();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Edit selected profile");
+
+        ImGui::SameLine();
+
+        ImGui::BeginDisabled(!canRemove);
+        if (ImGui::Button(ICON_FA_TRASH_ALT "##RemoveProfile"))
         {
             SaveEditorIntoSelected();
             SaveManager.RemoveCurrentProfile();
@@ -413,23 +556,67 @@ namespace manifold
             SaveManager.SaveConfig();
             AddLog("Profile removed.", Warn());
         }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Remove selected profile");
+        ImGui::EndDisabled();
+        ImGui::EndDisabled();
 
         ImGui::Separator();
+
         if (ImGui::BeginListBox("##ProfileListPane", ImVec2(-1.0f, -1.0f)))
         {
             for (int i = 0; i < static_cast<int>(game.Profiles.size()); ++i)
             {
                 const GameProfile& profile = game.Profiles[i];
                 const bool selected = i == SaveManager.SelectedProfile();
-                std::string label = profile.Favorite ? ("★ " + profile.Name) : profile.Name;
-                label += "##" + profile.Id;
+
+                std::string label;
+                if (profile.Favorite)
+                    label += ICON_FA_STAR " ";
+                label += profile.Name;
+                label += "##";
+                label += profile.Id;
+
+                ImGui::PushID(i);
+
                 if (ImGui::Selectable(label.c_str(), selected))
                 {
                     SaveEditorIntoSelected();
                     SaveManager.SetSelectedProfile(i);
                     LoadSelectedIntoEditor();
                 }
+
+                if (ImGui::BeginPopupContextItem("ProfileContext"))
+                {
+                    if (ImGui::MenuItem(ICON_FA_EDIT " Edit"))
+                        OpenEditProfileModal();
+
+                    if (ImGui::MenuItem(ICON_FA_EXCHANGE_ALT " Activate"))
+                    {
+                        SaveEditorIntoSelected();
+                        SaveManager.SetSelectedProfile(i);
+                        LoadSelectedIntoEditor();
+                        SaveManager.SaveConfig();
+                        AddLog("Profile activated.", Good());
+                    }
+
+                    ImGui::Separator();
+
+                    if (ImGui::MenuItem(ICON_FA_TRASH_ALT " Remove", nullptr, false, game.Profiles.size() > 1))
+                    {
+                        SaveEditorIntoSelected();
+                        SaveManager.SetSelectedProfile(i);
+                        SaveManager.RemoveCurrentProfile();
+                        LoadSelectedIntoEditor();
+                        SaveManager.SaveConfig();
+                        AddLog("Profile removed.", Warn());
+                    }
+
+                    ImGui::EndPopup();
+                }
+
+                ImGui::PopID();
             }
+
             ImGui::EndListBox();
         }
     }
@@ -443,7 +630,7 @@ namespace manifold
             return;
         }
 
-        if (ImGui::Button("Edit Profile", ImVec2(-1.0f, 0.0f))) OpenEditProfileModal();
+        ImGui::TextDisabled("Selected profile settings");
         ImGui::Separator();
 
         if (ImGui::BeginTabBar("ProfileEditorTabs"))
@@ -460,7 +647,7 @@ namespace manifold
             }
             if (ImGui::BeginTabItem("Notes"))
             {
-                ImGui::InputTextMultiline("##ProfileNotes", ProfileEditor.Notes.data(), ProfileEditor.Notes.size(), ImVec2(-1.0f, -1.0f));
+                ImGui::InputTextMultiline("##ProfileNotes", ProfileEditor.Notes.data(), ProfileEditor.Notes.size(), ImVec2(-1.0f, -35.0f));
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
@@ -477,7 +664,7 @@ namespace manifold
     void SaveManagerApp::Impl::DrawGameConfigWindow()
     {
         if (!ShowGameConfig) return;
-        ImGui::Begin("Game Config", &ShowGameConfig);
+        ImGui::Begin(ICON_FA_COG " Game Config###Game Config", &ShowGameConfig);
 
         GameDefinition* game = SaveManager.CurrentGame();
         if (!game)
@@ -507,12 +694,16 @@ namespace manifold
         if (ImGui::Combo("Save Scope", &scopeIndex, scopeNames, IM_ARRAYSIZE(scopeNames)))
             game->ScopeMode = static_cast<SaveScopeMode>(scopeIndex);
 
-        if (ImGui::Button("Open Save Folder", ImVec2(-1.0f, 0.0f)))
+        ImGui::Spacing();
+        if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open Folder", ImVec2(160.0f, 0.0f)))
         {
             const bool ok = OpenInExplorer(GameEditor.SavePath.data());
             AddLog(ok ? "Save path opened." : "Save path could not be opened.", ok ? Accent() : Bad());
         }
-        if (ImGui::Button("Apply Game Changes", ImVec2(-1.0f, 0.0f)))
+
+        ImGui::SameLine();
+
+        if (ImGui::Button(ICON_FA_SAVE " Save Changes", ImVec2(170.0f, 0.0f)))
         {
             SaveEditorIntoSelected();
             const bool ok = SaveManager.SaveConfig();
@@ -527,7 +718,7 @@ namespace manifold
     void SaveManagerApp::Impl::DrawScopeRulesWindow()
     {
         if (!ShowScopeRules) return;
-        ImGui::Begin("Scope Rules", &ShowScopeRules);
+        ImGui::Begin(ICON_FA_FILTER " Scope Rules###Scope Rules", &ShowScopeRules);
 
         GameDefinition* game = SaveManager.CurrentGame();
         if (!game)
@@ -605,7 +796,7 @@ namespace manifold
     void SaveManagerApp::Impl::DrawBackupsWindow()
     {
         if (!ShowBackups) return;
-        ImGui::Begin("Backups", &ShowBackups);
+        ImGui::Begin(ICON_FA_ARCHIVE " Backups###Backups", &ShowBackups);
         ImGui::Checkbox("Clear target before restore", &ClearBeforeRestore);
         ImGui::Checkbox("Auto backup before overwrite / restore", &BackupBeforeOverwrite);
 
@@ -638,54 +829,135 @@ namespace manifold
     void SaveManagerApp::Impl::DrawBackupDetailsWindow()
     {
         if (!ShowBackupDetails) return;
-        ImGui::Begin("Backup Details", &ShowBackupDetails);
+
+        ImGui::Begin(ICON_FA_INFO_CIRCLE " Backup Details###Backup Details", &ShowBackupDetails);
+
         const BackupEntry* backup = SaveManager.CurrentBackup();
         if (!backup)
         {
             ImGui::TextDisabled("No backup selected.");
+            ImGui::Separator();
+            ImGui::TextDisabled("Select a backup from the Backups window to inspect its details.");
             ImGui::End();
             return;
         }
 
-        ImGui::Text("Selected Backup: %s", backup->Name.c_str());
-        if (!backup->Reason.empty()) ImGui::TextDisabled("Reason: %s", backup->Reason.c_str());
-        ImGui::TextWrapped("%s", backup->FullPath.c_str());
-        ImGui::TextWrapped("MD5: %s", backup->BackupHash.c_str());
+        ImGui::TextUnformatted(backup->Name.c_str());
+
+        if (!backup->Reason.empty())
+        {
+            ImGui::TextDisabled("Reason");
+            ImGui::SameLine();
+            ImGui::TextWrapped("%s", backup->Reason.c_str());
+        }
+
+        ImGui::Spacing();
+
+        if (ImGui::BeginTable("BackupMetaTable", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerV))
+        {
+            ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextDisabled("Path");
+            ImGui::TableNextColumn();
+            const std::string displayPath = StripPathForDisplay(backup->FullPath);
+            ImGui::TextWrapped("%s", displayPath.c_str());
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", backup->FullPath.c_str());
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextDisabled("Hash");
+            ImGui::TableNextColumn();
+            if (backup->BackupHash.empty())
+                ImGui::TextDisabled("Unavailable");
+            else
+                ImGui::TextWrapped("%s", backup->BackupHash.c_str());
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextDisabled("Files");
+            ImGui::TableNextColumn();
+            ImGui::Text("%d", static_cast<int>(backup->PreviewFiles.size()));
+
+            ImGui::EndTable();
+        }
+
+        ImGui::Spacing();
         DrawBackupActionButtons(*backup);
         DrawDeleteBackupPopup();
+
         ImGui::Separator();
 
-        if (ImGui::BeginTable("PreviewTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY))
+        ImGui::TextDisabled("Preview");
+        ImGui::SameLine();
+        ImGui::Text("(%d files)", static_cast<int>(backup->PreviewFiles.size()));
+
+        ImGui::Spacing();
+
+        if (backup->PreviewFiles.empty())
+        {
+            ImGui::TextDisabled("No preview files available for this backup.");
+            ImGui::End();
+            return;
+        }
+
+        if (ImGui::BeginTable("PreviewTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY, ImVec2(0.0f, 0.0f)))
         {
             ImGui::TableSetupColumn("Relative Path", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+            ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 100.0f);
             ImGui::TableHeadersRow();
+
             for (const auto& file : backup->PreviewFiles)
             {
                 ImGui::TableNextRow();
-                ImGui::TableNextColumn(); ImGui::TextWrapped("%s", file.RelativePath.c_str());
-                ImGui::TableNextColumn(); ImGui::TextUnformatted(HumanSize(file.Size).c_str());
+
+                ImGui::TableNextColumn();
+                ImGui::TextWrapped("%s", file.RelativePath.c_str());
+
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(HumanSize(file.Size).c_str());
             }
+
             ImGui::EndTable();
         }
+
         ImGui::End();
     }
 
     void SaveManagerApp::Impl::DrawBackupActionButtons(const BackupEntry& backup)
     {
-        if (ImGui::Button("Restore Backup", ImVec2(-1.0f, 34.0f))) OpenRestoreModal = true;
-        if (ImGui::Button("Open Backup", ImVec2(-1.0f, 34.0f)))
+        const float buttonWidth = 120.0f;
+
+        if (ImGui::Button(ICON_FA_UNDO " Restore", ImVec2(buttonWidth, 0.0f)))
+            OpenRestoreModal = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Restore the selected backup");
+
+        ImGui::SameLine();
+
+        if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open", ImVec2(buttonWidth, 0.0f)))
         {
             const bool ok = OpenInExplorer(backup.FullPath);
             AddLog(ok ? "Backup opened." : "Backup could not be opened.", ok ? Accent() : Bad());
         }
-        if (ImGui::Button("Delete Backup", ImVec2(-1.0f, 34.0f))) ImGui::OpenPopup("DeleteBackupConfirm");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Open the backup folder");
+
+        ImGui::SameLine();
+
+        if (ImGui::Button(ICON_FA_TRASH_ALT " Delete", ImVec2(buttonWidth, 0.0f)))
+            ImGui::OpenPopup("DeleteBackupConfirm");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Delete the selected backup");
     }
 
     void SaveManagerApp::Impl::DrawActivityWindow()
     {
         if (!ShowActivityLog) return;
-        ImGui::Begin("Activity Log", &ShowActivityLog);
+        ImGui::Begin(ICON_FA_STREAM " Activity Log###Activity Log", &ShowActivityLog);
         for (const auto& entry : Log) ImGui::TextColored(entry.Color, "%s", entry.Message.c_str());
         ImGui::End();
     }
@@ -748,10 +1020,14 @@ namespace manifold
 
     void SaveManagerApp::Impl::DrawGameModal()
     {
-        if (OpenGameModal) { ImGui::OpenPopup(GameModalMode == 1 ? "Create Game" : "Edit Game"); OpenGameModal = false; }
+        if (OpenGameModal)
+        {
+            ImGui::OpenPopup(GameModalMode == 1 ? "Create Game" : "Edit Game");
+            OpenGameModal = false;
+        }
         const char* title = GameModalMode == 1 ? "Create Game" : "Edit Game";
-        if (!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
-
+        if (!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            return;
         ImGui::InputText("Game Id", GameModal.Id.data(), GameModal.Id.size());
         ImGui::InputText("Display Name", GameModal.Name.data(), GameModal.Name.size());
         ImGui::InputText("Save Path", GameModal.SavePath.data(), GameModal.SavePath.size());
@@ -760,43 +1036,64 @@ namespace manifold
         const char* scopeNames[] = { "File Whitelist", "Folder Mode", "Hybrid Mode" };
         ImGui::Combo("Save Scope", &GameModal.ScopeMode, scopeNames, IM_ARRAYSIZE(scopeNames));
         ImGui::InputTextMultiline("Notes", GameModal.Notes.data(), GameModal.Notes.size(), ImVec2(520.0f, 150.0f));
-
         if (ImGui::Button("Save", ImVec2(140.0f, 0.0f)))
         {
-            if (GameModalMode == 1)
+            const std::string sanitizedId = SanitizeId(GameModal.Id.data());
+            if (sanitizedId.empty())
             {
-                GameDefinition game;
-                game.Id = SanitizeId(GameModal.Id.data());
-                game.DisplayName = GameModal.Name.data();
-                game.SavePath = GameModal.SavePath.data();
-                game.ProcessName = GameModal.ProcessName.data();
-                game.Notes = GameModal.Notes.data();
-                game.Enabled = GameModal.Enabled;
-                game.ScopeMode = static_cast<SaveScopeMode>(GameModal.ScopeMode);
-                game.Profiles.push_back({ "vanilla", "Vanilla", "Default profile", "", true, true, 20 });
-                game.ActiveProfileId = "vanilla";
-                SaveManager.Games().push_back(std::move(game));
-                SaveManager.SetSelectedGame(static_cast<int>(SaveManager.Games().size()) - 1);
-                LoadSelectedIntoEditor();
-                AddLog("Game created.", Good());
+                AddLog("Game Id must not be empty.", Bad());
             }
-            else if (GameDefinition* game = SaveManager.CurrentGame())
+            else if (GameModalMode == 1)
             {
-                game->Id = SanitizeId(GameModal.Id.data());
-                game->DisplayName = GameModal.Name.data();
-                game->SavePath = GameModal.SavePath.data();
-                game->ProcessName = GameModal.ProcessName.data();
-                game->Notes = GameModal.Notes.data();
-                game->Enabled = GameModal.Enabled;
-                game->ScopeMode = static_cast<SaveScopeMode>(GameModal.ScopeMode);
-                LoadSelectedIntoEditor();
-                AddLog("Game updated.", Good());
+                SaveManager.AddGame();
+                if (GameDefinition* game = SaveManager.CurrentGame())
+                {
+                    game->Id = sanitizedId;
+                    game->DisplayName = GameModal.Name.data();
+                    game->SavePath = GameModal.SavePath.data();
+                    game->ProcessName = GameModal.ProcessName.data();
+                    game->Notes = GameModal.Notes.data();
+                    game->Enabled = GameModal.Enabled;
+                    game->ScopeMode = static_cast<SaveScopeMode>(GameModal.ScopeMode);
+                    if (!SaveManager.SaveConfig())
+                        AddLog("Game created, but config could not be saved.", Bad());
+                    else
+                        AddLog("Game created.", Good());
+                    LoadSelectedIntoEditor();
+                    ImGui::CloseCurrentPopup();
+                }
+                else
+                {
+                    AddLog("Game could not be created.", Bad());
+                }
             }
-            SaveManager.SaveConfig();
-            ImGui::CloseCurrentPopup();
+            else
+            {
+                if (GameDefinition* game = SaveManager.CurrentGame())
+                {
+                    game->Id = sanitizedId;
+                    game->DisplayName = GameModal.Name.data();
+                    game->SavePath = GameModal.SavePath.data();
+                    game->ProcessName = GameModal.ProcessName.data();
+                    game->Notes = GameModal.Notes.data();
+                    game->Enabled = GameModal.Enabled;
+                    game->ScopeMode = static_cast<SaveScopeMode>(GameModal.ScopeMode);
+                    if (!SaveManager.SaveConfig())
+                        AddLog("Game updated, but config could not be saved.", Bad());
+                    else
+                        AddLog("Game updated.", Good());
+                    LoadSelectedIntoEditor();
+                    ImGui::CloseCurrentPopup();
+                }
+                else
+                {
+                    AddLog("No game selected for editing.", Bad());
+                }
+            }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(140.0f, 0.0f))) ImGui::CloseCurrentPopup();
+        if (ImGui::Button("Cancel", ImVec2(140.0f, 0.0f)))
+            ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 
@@ -1350,5 +1647,26 @@ namespace manifold
         ProfileEditor.Name.fill('\0');
         ProfileEditor.Description.fill('\0');
         ProfileEditor.Notes.fill('\0');
+    }
+
+    void SaveManagerApp::Impl::LoadManifoldFonts()
+    {
+        ImGuiIO& io = ImGui::GetIO();
+
+        ImFontConfig baseConfig;
+        baseConfig.OversampleH = 2;
+        baseConfig.OversampleV = 2;
+        baseConfig.PixelSnapH = false;
+
+        io.Fonts->AddFontDefault();
+
+        static const ImWchar iconRanges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
+
+        ImFontConfig iconConfig;
+        iconConfig.MergeMode = true;
+        iconConfig.PixelSnapH = true;
+        iconConfig.GlyphMinAdvanceX = 16.0f;
+
+        io.Fonts->AddFontFromMemoryTTF(rawData, sizeof(rawData), 10.0f, &iconConfig, iconRanges);
     }
 }

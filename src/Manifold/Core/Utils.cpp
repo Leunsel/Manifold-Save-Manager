@@ -646,4 +646,29 @@ namespace manifold
         const HINSTANCE result = ShellExecuteA(nullptr, "open", url, nullptr, nullptr, SW_SHOWNORMAL);
         return reinterpret_cast<intptr_t>(result) > 32;
     }
+
+    std::string ToLowerCopy(std::string value)
+    {
+        std::transform(value.begin(), value.end(), value.begin(),
+            [](unsigned char c)
+            {
+                return static_cast<char>(std::tolower(c));
+            });
+        return value;
+    }
+
+    std::string StripPathForDisplay(const std::string& fullPath)
+    {
+        constexpr const char* anchor = "SaveManager\\";
+        const size_t pos = fullPath.find(anchor);
+        if (pos != std::string::npos)
+            return "...\\" + fullPath.substr(pos);
+
+        constexpr const char* altAnchor = "SaveManager/";
+        const size_t altPos = fullPath.find(altAnchor);
+        if (altPos != std::string::npos)
+            return ".../" + fullPath.substr(altPos);
+
+        return fullPath;
+    }
 }

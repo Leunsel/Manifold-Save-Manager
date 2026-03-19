@@ -49,6 +49,8 @@ namespace manifold
     std::vector<BackupEntry> LoadBackupsForProfile(const GameDefinition& game, const GameProfile& profile);
 
     bool OpenUrl(const char* url);
+    std::string ToLowerCopy(std::string value);
+    std::string StripPathForDisplay(const std::string& fullPath);
 
     template <size_t N>
     void WriteToBuffer(std::array<char, N>& buffer, const std::string& text)

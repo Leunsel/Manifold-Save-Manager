@@ -101,5 +101,11 @@
     <ClInclude Include="Manifold\Core\Math.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="Manifold\Font\IconsFontAwesome5.hpp">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Manifold\Font\Manifold-Font.hpp">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

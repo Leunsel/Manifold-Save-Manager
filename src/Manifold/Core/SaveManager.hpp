@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "Models.hpp"
@@ -43,6 +44,10 @@ namespace manifold
         OperationResult DeleteSelectedBackup();
 
     private:
+        bool PersistState();
+        void ResetSelections();
+        void NormalizeSelectionState();
+
         std::string MakeUniqueGameId(const std::string& base) const;
         std::string MakeUniqueProfileId(const GameDefinition& game, const std::string& base) const;
         void EnforceBackupLimit(const GameDefinition& game, const GameProfile& profile);

@@ -2,20 +2,95 @@
 
 #include <algorithm>
 #include <fstream>
+#include <system_error>
 
 #include "Utils.hpp"
 
 namespace manifold
 {
+    bool SaveManager::PersistState()
+    {
+        return SaveConfig();
+    }
+
+    void SaveManager::ResetSelections()
+    {
+        m_SelectedGame = -1;
+        m_SelectedProfile = -1;
+        m_SelectedBackup = -1;
+        m_Backups.clear();
+    }
+
+    void SaveManager::NormalizeSelectionState()
+    {
+        if (m_Games.empty())
+        {
+            ResetSelections();
+            return;
+        }
+
+        m_SelectedGame = std::clamp(m_SelectedGame, 0, static_cast<int>(m_Games.size()) - 1);
+
+        GameDefinition* game = CurrentGame();
+        if (!game)
+        {
+            ResetSelections();
+            return;
+        }
+
+        if (game->Profiles.empty())
+        {
+            GameProfile profile;
+            profile.Id = "vanilla";
+            profile.Name = "Vanilla";
+            profile.Description = "Default profile";
+            profile.AutoBackupOnSwitch = true;
+            profile.BackupLimit = 20;
+            game->Profiles.push_back(std::move(profile));
+        }
+
+        bool activeFound = false;
+        for (int i = 0; i < static_cast<int>(game->Profiles.size()); ++i)
+        {
+            if (game->Profiles[i].Id == game->ActiveProfileId)
+            {
+                m_SelectedProfile = i;
+                activeFound = true;
+                break;
+            }
+        }
+
+        if (!activeFound)
+        {
+            m_SelectedProfile = 0;
+            game->ActiveProfileId = game->Profiles[0].Id;
+        }
+
+        m_SelectedProfile = std::clamp(m_SelectedProfile, 0, static_cast<int>(game->Profiles.size()) - 1);
+
+        if (m_SelectedBackup >= static_cast<int>(m_Backups.size()))
+            m_SelectedBackup = -1;
+    }
+
     void SaveManager::Load()
     {
         m_Games = LoadConfigFile();
+
         if (m_Games.empty())
-            AddGame();
-        if (!m_Games.empty())
-            m_SelectedGame = 0;
-        SyncSelectedProfileFromActive();
+        {
+            GameDefinition game;
+            game.Id = "new_game";
+            game.DisplayName = "New Game";
+            game.ScopeMode = SaveScopeMode::FolderMode;
+            game.Profiles.push_back({ "vanilla", "Vanilla", "Default profile", "", true, true, 20 });
+            game.ActiveProfileId = "vanilla";
+            m_Games.push_back(std::move(game));
+        }
+
+        m_SelectedGame = 0;
+        NormalizeSelectionState();
         RefreshBackups();
+        PersistState();
     }
 
     bool SaveManager::SaveConfig() const { return SaveConfigFile(m_Games); }
@@ -28,23 +103,32 @@ namespace manifold
 
     void SaveManager::SetSelectedGame(int index)
     {
-        if (index >= 0 && index < static_cast<int>(m_Games.size()))
-        {
-            m_SelectedGame = index;
-            m_SelectedBackup = -1;
-            SyncSelectedProfileFromActive();
-            RefreshBackups();
-        }
+        if (index < 0 || index >= static_cast<int>(m_Games.size()))
+            return;
+
+        if (m_SelectedGame == index)
+            return;
+
+        m_SelectedGame = index;
+        m_SelectedBackup = -1;
+        SyncSelectedProfileFromActive();
+        RefreshBackups();
     }
 
     void SaveManager::SetSelectedProfile(int index)
     {
         GameDefinition* game = CurrentGame();
-        if (!game || index < 0 || index >= static_cast<int>(game->Profiles.size())) return;
+        if (!game || index < 0 || index >= static_cast<int>(game->Profiles.size()))
+            return;
+
+        if (m_SelectedProfile == index && game->ActiveProfileId == game->Profiles[index].Id)
+            return;
+
         m_SelectedProfile = index;
         game->ActiveProfileId = game->Profiles[index].Id;
         m_SelectedBackup = -1;
         RefreshBackups();
+        PersistState();
     }
 
     void SaveManager::SetSelectedBackup(int index)
@@ -55,43 +139,53 @@ namespace manifold
 
     GameDefinition* SaveManager::CurrentGame()
     {
-        if (m_SelectedGame < 0 || m_SelectedGame >= static_cast<int>(m_Games.size())) return nullptr;
+        if (m_SelectedGame < 0 || m_SelectedGame >= static_cast<int>(m_Games.size()))
+            return nullptr;
         return &m_Games[m_SelectedGame];
     }
 
     const GameDefinition* SaveManager::CurrentGame() const
     {
-        if (m_SelectedGame < 0 || m_SelectedGame >= static_cast<int>(m_Games.size())) return nullptr;
+        if (m_SelectedGame < 0 || m_SelectedGame >= static_cast<int>(m_Games.size()))
+            return nullptr;
         return &m_Games[m_SelectedGame];
     }
 
     GameProfile* SaveManager::CurrentProfile()
     {
         GameDefinition* game = CurrentGame();
-        if (!game || m_SelectedProfile < 0 || m_SelectedProfile >= static_cast<int>(game->Profiles.size())) return nullptr;
+        if (!game || m_SelectedProfile < 0 || m_SelectedProfile >= static_cast<int>(game->Profiles.size()))
+            return nullptr;
         return &game->Profiles[m_SelectedProfile];
     }
 
     const GameProfile* SaveManager::CurrentProfile() const
     {
         const GameDefinition* game = CurrentGame();
-        if (!game || m_SelectedProfile < 0 || m_SelectedProfile >= static_cast<int>(game->Profiles.size())) return nullptr;
+        if (!game || m_SelectedProfile < 0 || m_SelectedProfile >= static_cast<int>(game->Profiles.size()))
+            return nullptr;
         return &game->Profiles[m_SelectedProfile];
     }
 
     const BackupEntry* SaveManager::CurrentBackup() const
     {
-        if (m_SelectedBackup < 0 || m_SelectedBackup >= static_cast<int>(m_Backups.size())) return nullptr;
+        if (m_SelectedBackup < 0 || m_SelectedBackup >= static_cast<int>(m_Backups.size()))
+            return nullptr;
         return &m_Backups[m_SelectedBackup];
     }
 
     void SaveManager::RefreshBackups()
     {
         m_Backups.clear();
+
         const GameDefinition* game = CurrentGame();
         const GameProfile* profile = CurrentProfile();
-        if (game && profile) m_Backups = LoadBackupsForProfile(*game, *profile);
-        if (m_SelectedBackup >= static_cast<int>(m_Backups.size())) m_SelectedBackup = -1;
+
+        if (game && profile)
+            m_Backups = LoadBackupsForProfile(*game, *profile);
+
+        if (m_SelectedBackup >= static_cast<int>(m_Backups.size()))
+            m_SelectedBackup = -1;
     }
 
     void SaveManager::AddGame()
@@ -102,31 +196,39 @@ namespace manifold
         game.ScopeMode = SaveScopeMode::FolderMode;
         game.Profiles.push_back({ "vanilla", "Vanilla", "Default profile", "", true, true, 20 });
         game.ActiveProfileId = "vanilla";
+
         m_Games.push_back(std::move(game));
         m_SelectedGame = static_cast<int>(m_Games.size()) - 1;
         SyncSelectedProfileFromActive();
         RefreshBackups();
+        PersistState();
     }
 
     void SaveManager::RemoveCurrentGame()
     {
-        if (m_SelectedGame < 0 || m_SelectedGame >= static_cast<int>(m_Games.size())) return;
+        if (m_SelectedGame < 0 || m_SelectedGame >= static_cast<int>(m_Games.size()))
+            return;
+
         m_Games.erase(m_Games.begin() + m_SelectedGame);
+
         if (m_Games.empty())
         {
-            m_SelectedGame = m_SelectedProfile = m_SelectedBackup = -1;
-            m_Backups.clear();
+            ResetSelections();
+            PersistState();
             return;
         }
+
         m_SelectedGame = std::clamp(m_SelectedGame, 0, static_cast<int>(m_Games.size()) - 1);
         SyncSelectedProfileFromActive();
         RefreshBackups();
+        PersistState();
     }
 
     void SaveManager::AddProfileToCurrentGame()
     {
         GameDefinition* game = CurrentGame();
-        if (!game) return;
+        if (!game)
+            return;
 
         GameProfile profile;
         profile.Id = MakeUniqueProfileId(*game, "profile");
@@ -137,28 +239,39 @@ namespace manifold
 
         game->Profiles.push_back(profile);
         game->ActiveProfileId = profile.Id;
+
         SyncSelectedProfileFromActive();
         RefreshBackups();
+        PersistState();
     }
 
     void SaveManager::RemoveCurrentProfile()
     {
         GameDefinition* game = CurrentGame();
-        if (!game || m_SelectedProfile < 0 || m_SelectedProfile >= static_cast<int>(game->Profiles.size()) || game->Profiles.size() == 1)
+        if (!game ||
+            m_SelectedProfile < 0 ||
+            m_SelectedProfile >= static_cast<int>(game->Profiles.size()) ||
+            game->Profiles.size() <= 1)
+        {
             return;
+        }
 
         game->Profiles.erase(game->Profiles.begin() + m_SelectedProfile);
         m_SelectedProfile = std::clamp(m_SelectedProfile, 0, static_cast<int>(game->Profiles.size()) - 1);
         game->ActiveProfileId = game->Profiles[m_SelectedProfile].Id;
+
         RefreshBackups();
+        PersistState();
     }
 
     OperationResult SaveManager::CreateBackupForCurrentProfile(const std::string& reason)
     {
         GameDefinition* game = CurrentGame();
         GameProfile* profile = CurrentProfile();
+
         if (!game) return { false, "No game selected." };
         if (!profile) return { false, "No profile selected." };
+        if (game->SavePath.empty()) return { false, "Save path is empty." };
         if (!DirectoryExists(game->SavePath)) return { false, "Save path does not exist." };
 
         const auto items = GatherSaveItems(*game);
@@ -170,12 +283,13 @@ namespace manifold
 
         std::error_code ec;
         fs::create_directories(destination, ec);
-        if (ec) return { false, "Backup folder could not be created." };
+        if (ec) return { false, "Backup folder could not be created: " + ec.message() };
 
         for (const fs::path& item : items)
         {
             OperationResult result = CopyItemIntoContainer(saveRoot, item, destination, false);
-            if (!result.Success) return result;
+            if (!result.Success)
+                return result;
         }
 
         if (const auto hash = ComputeDirectoryAggregateMd5(destination); hash.has_value())
@@ -199,11 +313,41 @@ namespace manifold
     {
         GameDefinition* game = CurrentGame();
         GameProfile* profile = CurrentProfile();
-        const BackupEntry* backup = CurrentBackup();
+        const BackupEntry* selectedBackup = CurrentBackup();
+
         if (!game) return { false, "No game selected." };
         if (!profile) return { false, "No profile selected." };
-        if (!backup) return { false, "No backup selected." };
+        if (!selectedBackup) return { false, "No backup selected." };
         if (game->SavePath.empty()) return { false, "Save path is empty." };
+
+        const std::string backupFullPath = selectedBackup->FullPath;
+        const fs::path source = Utf8ToWide(backupFullPath);
+        const fs::path destination = Utf8ToWide(game->SavePath);
+
+        std::error_code ec;
+
+        if (!fs::exists(source, ec) || ec)
+            return { false, "Selected backup path does not exist." };
+
+        if (!fs::is_directory(source, ec) || ec)
+            return { false, "Selected backup path is not a directory." };
+
+        bool hasPayload = false;
+        for (fs::recursive_directory_iterator it(source, ec), end; !ec && it != end; ++it)
+        {
+            const auto name = it->path().filename();
+            if (name == L".backup.md5" || name == L".reason.txt")
+                continue;
+
+            hasPayload = true;
+            break;
+        }
+
+        if (ec)
+            return { false, "Backup enumeration failed: " + ec.message() };
+
+        if (!hasPayload)
+            return { false, "Selected backup is empty." };
 
         if (backupBeforeOverwrite)
         {
@@ -212,41 +356,57 @@ namespace manifold
                 return { false, "Restore aborted because the pre-restore backup failed: " + result.Message };
         }
 
-        const fs::path source = Utf8ToWide(backup->FullPath);
-        const fs::path destination = Utf8ToWide(game->SavePath);
-
         if (clearDestinationFirst)
         {
             auto clearResult = ClearDirectoryContents(destination);
-            if (!clearResult.Success) return clearResult;
+            if (!clearResult.Success)
+                return clearResult;
         }
 
-        std::error_code ec;
         fs::create_directories(destination, ec);
-        if (ec) return { false, "Destination folder could not be created." };
+        if (ec)
+            return { false, "Destination folder could not be created: " + ec.message() };
 
-        for (const auto& entry : fs::recursive_directory_iterator(source, ec))
+        for (fs::recursive_directory_iterator it(source, ec), end; !ec && it != end; ++it)
         {
-            if (ec) return { false, "Backup enumeration failed." };
-            if (entry.path().filename() == L".backup.md5" || entry.path().filename() == L".reason.txt") continue;
+            const auto& entry = *it;
+            const auto name = entry.path().filename();
+
+            if (name == L".backup.md5" || name == L".reason.txt")
+                continue;
 
             fs::path relative = fs::relative(entry.path(), source, ec);
-            if (ec) return { false, "Relative restore path could not be resolved." };
+            if (ec)
+                return { false, "Relative restore path could not be resolved: " + ec.message() };
+
             fs::path target = destination / relative;
 
             if (entry.is_directory(ec))
             {
+                if (ec)
+                    return { false, "Restore directory check failed: " + ec.message() };
+
                 fs::create_directories(target, ec);
-                if (ec) return { false, "Target restore directory could not be created." };
+                if (ec)
+                    return { false, "Target restore directory could not be created: " + ec.message() };
             }
             else if (entry.is_regular_file(ec))
             {
+                if (ec)
+                    return { false, "Restore file check failed: " + ec.message() };
+
                 fs::create_directories(target.parent_path(), ec);
-                if (ec) return { false, "Target restore parent could not be created." };
+                if (ec)
+                    return { false, "Target restore parent could not be created: " + ec.message() };
+
                 fs::copy_file(entry.path(), target, fs::copy_options::overwrite_existing, ec);
-                if (ec) return { false, "Restore file copy failed: " + ec.message() };
+                if (ec)
+                    return { false, "Restore file copy failed: " + ec.message() };
             }
         }
+
+        if (ec)
+            return { false, "Backup enumeration failed: " + ec.message() };
 
         return { true, "Backup restored to active save path." };
     }
@@ -255,8 +415,10 @@ namespace manifold
     {
         GameDefinition* game = CurrentGame();
         if (!game) return { false, "No game selected." };
-        if (newProfileIndex < 0 || newProfileIndex >= static_cast<int>(game->Profiles.size())) return { false, "Invalid target profile." };
-        if (newProfileIndex == m_SelectedProfile) return { true, "Profile already active." };
+        if (newProfileIndex < 0 || newProfileIndex >= static_cast<int>(game->Profiles.size()))
+            return { false, "Invalid target profile." };
+        if (newProfileIndex == m_SelectedProfile)
+            return { true, "Profile already active." };
 
         GameProfile* current = CurrentProfile();
         if (current && createAutoBackup && current->AutoBackupOnSwitch)
@@ -269,6 +431,8 @@ namespace manifold
         m_SelectedProfile = newProfileIndex;
         game->ActiveProfileId = game->Profiles[m_SelectedProfile].Id;
         RefreshBackups();
+        PersistState();
+
         return { true, "Active profile switched." };
     }
 
@@ -277,9 +441,12 @@ namespace manifold
         const BackupEntry* backup = CurrentBackup();
         if (!backup) return { false, "No backup selected." };
 
+        const std::string fullPath = backup->FullPath;
+
         std::error_code ec;
-        fs::remove_all(Utf8ToWide(backup->FullPath), ec);
-        if (ec) return { false, "Backup could not be deleted: " + ec.message() };
+        fs::remove_all(Utf8ToWide(fullPath), ec);
+        if (ec)
+            return { false, "Backup could not be deleted: " + ec.message() };
 
         RefreshBackups();
         m_SelectedBackup = -1;
@@ -295,6 +462,13 @@ namespace manifold
             return;
         }
 
+        if (game->Profiles.empty())
+        {
+            m_SelectedProfile = -1;
+            game->ActiveProfileId.clear();
+            return;
+        }
+
         for (int i = 0; i < static_cast<int>(game->Profiles.size()); ++i)
         {
             if (game->Profiles[i].Id == game->ActiveProfileId)
@@ -305,41 +479,54 @@ namespace manifold
         }
 
         m_SelectedProfile = 0;
-        if (!game->Profiles.empty()) game->ActiveProfileId = game->Profiles[0].Id;
+        game->ActiveProfileId = game->Profiles[0].Id;
     }
 
     std::string SaveManager::MakeUniqueGameId(const std::string& base) const
     {
         std::string id = SanitizeId(base);
+        if (id.empty())
+            id = "game";
+
         int suffix = 1;
         auto exists = [&](const std::string& value)
-        {
-            return std::any_of(m_Games.begin(), m_Games.end(), [&](const GameDefinition& g) { return g.Id == value; });
-        };
+            {
+                return std::any_of(m_Games.begin(), m_Games.end(),
+                    [&](const GameDefinition& g) { return g.Id == value; });
+            };
 
         std::string candidate = id;
-        while (exists(candidate)) candidate = id + "_" + std::to_string(suffix++);
+        while (exists(candidate))
+            candidate = id + "_" + std::to_string(suffix++);
+
         return candidate;
     }
 
     std::string SaveManager::MakeUniqueProfileId(const GameDefinition& game, const std::string& base) const
     {
         std::string id = SanitizeId(base);
+        if (id.empty())
+            id = "profile";
+
         int suffix = 1;
         auto exists = [&](const std::string& value)
-        {
-            return std::any_of(game.Profiles.begin(), game.Profiles.end(), [&](const GameProfile& p) { return p.Id == value; });
-        };
+            {
+                return std::any_of(game.Profiles.begin(), game.Profiles.end(),
+                    [&](const GameProfile& p) { return p.Id == value; });
+            };
 
         std::string candidate = id;
-        while (exists(candidate)) candidate = id + "_" + std::to_string(suffix++);
+        while (exists(candidate))
+            candidate = id + "_" + std::to_string(suffix++);
+
         return candidate;
     }
 
     void SaveManager::EnforceBackupLimit(const GameDefinition& game, const GameProfile& profile)
     {
         auto backups = LoadBackupsForProfile(game, profile);
-        if (profile.BackupLimit <= 0 || static_cast<int>(backups.size()) <= profile.BackupLimit) return;
+        if (profile.BackupLimit <= 0 || static_cast<int>(backups.size()) <= profile.BackupLimit)
+            return;
 
         for (size_t i = static_cast<size_t>(profile.BackupLimit); i < backups.size(); ++i)
         {

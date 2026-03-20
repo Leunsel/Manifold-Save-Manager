@@ -449,11 +449,11 @@ namespace manifold
 
         ImGui::Separator();
         ImGui::TextDisabled("Selection");
-        if (game)
-        {
-            ImGui::TextUnformatted((game->DisplayName.empty() ? game->Id : game->DisplayName).c_str());
-            ImGui::TextDisabled("%s", game->SavePath.empty() ? "No save path configured" : game->SavePath.c_str());
-        }
+        // if (game)
+        // {
+        //     ImGui::TextUnformatted((game->DisplayName.empty() ? game->Id : game->DisplayName).c_str());
+        //     ImGui::TextDisabled("%s", game->SavePath.empty() ? "No save path configured" : game->SavePath.c_str());
+        // }
         if (profile)
             ImGui::TextDisabled("Active Profile: %s", profile->Name.c_str());
 
@@ -687,7 +687,7 @@ namespace manifold
             if (auto folder = PickFolderDialog(MainWindow, L"Select Save Folder")) WriteToBuffer(GameEditor.SavePath, *folder);
 
         ImGui::InputText("Process Name", GameEditor.ProcessName.data(), GameEditor.ProcessName.size());
-        ImGui::InputTextMultiline("Game Notes", GameEditor.Notes.data(), GameEditor.Notes.size(), ImVec2(-1.0f, 180.0f));
+        ImGui::InputTextMultiline("Game Notes", GameEditor.Notes.data(), GameEditor.Notes.size(), ImVec2(-100.0f, 180.0f));
 
         const char* scopeNames[] = { "File Whitelist", "Folder Mode", "Hybrid Mode" };
         int scopeIndex = static_cast<int>(game->ScopeMode);
@@ -718,48 +718,85 @@ namespace manifold
     void SaveManagerApp::Impl::DrawScopeRulesWindow()
     {
         if (!ShowScopeRules) return;
+
         ImGui::Begin(ICON_FA_FILTER " Scope Rules###Scope Rules", &ShowScopeRules);
 
         GameDefinition* game = SaveManager.CurrentGame();
         if (!game)
         {
             ImGui::TextDisabled("No game selected.");
+            ImGui::Separator();
+            ImGui::TextDisabled("Select a game to manage whitelist and folder rules.");
             ImGui::End();
             return;
         }
 
-        ImGui::TextDisabled("Current scope mode: %s", ToString(game->ScopeMode));
+        ImGui::TextDisabled("Scope Mode");
+        ImGui::SameLine();
+        ImGui::TextUnformatted(ToString(game->ScopeMode));
+
         ImGui::Separator();
-        ImGui::InputText("New Rule", ProfileEditor.ScopeRule.data(), ProfileEditor.ScopeRule.size());
-        if (ImGui::Button("Add File Rule", ImVec2(-1.0f, 0.0f)))
+
+        static int newRuleType = 0;
+        const char* ruleKinds[] = { "File Rule", "Folder Rule" };
+
+        ImGui::SetNextItemWidth(150.0f);
+        ImGui::Combo("##RuleType", &newRuleType, ruleKinds, IM_ARRAYSIZE(ruleKinds));
+
+        ImGui::SameLine();
+
+        ImGui::SetNextItemWidth(-110.0f);
+        ImGui::InputTextWithHint(
+            "##NewScopeRule",
+            "Relative path, e.g. SaveData.sav or Saves\\Slot1",
+            ProfileEditor.ScopeRule.data(),
+            ProfileEditor.ScopeRule.size());
+
+        ImGui::SameLine();
+
+        if (ImGui::Button(ICON_FA_PLUS " Add", ImVec2(90.0f, 0.0f)))
         {
             const std::string value = Trim(ProfileEditor.ScopeRule.data());
             if (!value.empty())
             {
-                game->Whitelist.push_back({ value, true });
+                if (newRuleType == 0)
+                {
+                    game->Whitelist.push_back({ value, true });
+                    AddLog("File whitelist rule added.", Accent());
+                }
+                else
+                {
+                    game->FolderRules.push_back({ value, true });
+                    AddLog("Folder rule added.", Accent());
+                }
+
                 WriteToBuffer(ProfileEditor.ScopeRule, "");
                 SaveManager.SaveConfig();
-                AddLog("File whitelist rule added.", Accent());
             }
-        }
-        if (ImGui::Button("Add Folder Rule", ImVec2(-1.0f, 0.0f)))
-        {
-            const std::string value = Trim(ProfileEditor.ScopeRule.data());
-            if (!value.empty())
+            else
             {
-                game->FolderRules.push_back({ value, true });
-                WriteToBuffer(ProfileEditor.ScopeRule, "");
-                SaveManager.SaveConfig();
-                AddLog("Folder rule added.", Accent());
+                AddLog("Scope rule must not be empty.", Bad());
             }
         }
 
-        ImGui::Separator();
-        ImGui::TextUnformatted("File Whitelist");
-        DrawScopeRuleTable(game->Whitelist, "WhitelistTable", 160.0f);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Add the entered rule to the selected rule group");
+
         ImGui::Spacing();
-        ImGui::TextUnformatted("Folder Rules");
+        ImGui::Separator();
+
+        ImGui::TextDisabled("File Whitelist");
+        ImGui::SameLine();
+        ImGui::Text("(%d)", static_cast<int>(game->Whitelist.size()));
+        DrawScopeRuleTable(game->Whitelist, "WhitelistTable", 180.0f);
+
+        ImGui::Spacing();
+
+        ImGui::TextDisabled("Folder Rules");
+        ImGui::SameLine();
+        ImGui::Text("(%d)", static_cast<int>(game->FolderRules.size()));
         DrawScopeRuleTable(game->FolderRules, "FolderRuleTable", 0.0f);
+
         ImGui::End();
     }
 
@@ -860,12 +897,12 @@ namespace manifold
 
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::TextDisabled("Path");
-            ImGui::TableNextColumn();
-            const std::string displayPath = StripPathForDisplay(backup->FullPath);
-            ImGui::TextWrapped("%s", displayPath.c_str());
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", backup->FullPath.c_str());
+            // ImGui::TextDisabled("Path");
+            // ImGui::TableNextColumn();
+            // const std::string displayPath = StripPathForDisplay(backup->FullPath);
+            // ImGui::TextWrapped("%s", displayPath.c_str());
+            // if (ImGui::IsItemHovered())
+            //     ImGui::SetTooltip("%s", backup->FullPath.c_str());
 
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
@@ -1653,12 +1690,15 @@ namespace manifold
     {
         ImGuiIO& io = ImGui::GetIO();
 
+        if (io.Fonts->Fonts.Size > 0)
+            return;
+
         ImFontConfig baseConfig;
-        baseConfig.OversampleH = 2;
-        baseConfig.OversampleV = 2;
+        baseConfig.OversampleH = 1;
+        baseConfig.OversampleV = 1;
         baseConfig.PixelSnapH = false;
 
-        io.Fonts->AddFontDefault();
+        io.Fonts->AddFontDefault(&baseConfig);
 
         static const ImWchar iconRanges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
 
@@ -1666,6 +1706,7 @@ namespace manifold
         iconConfig.MergeMode = true;
         iconConfig.PixelSnapH = true;
         iconConfig.GlyphMinAdvanceX = 16.0f;
+        iconConfig.FontDataOwnedByAtlas = false; // Prevent Deallocation Errors thrown by ImGui.
 
         io.Fonts->AddFontFromMemoryTTF(rawData, sizeof(rawData), 10.0f, &iconConfig, iconRanges);
     }

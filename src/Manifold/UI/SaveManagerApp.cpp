@@ -15,7 +15,7 @@
 #include <shellapi.h>
 
 #include "../Font/IconsFontAwesome5.hpp"
-#include "../Font/Manifold-Font.hpp"
+#include "../Font/Font.hpp"
 
 #include "../../Imgui/imgui.h"
 #include "../../ImGui/imgui_internal.h"

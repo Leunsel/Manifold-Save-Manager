@@ -104,7 +104,7 @@
     <ClInclude Include="Manifold\Font\IconsFontAwesome5.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="Manifold\Font\Manifold-Font.hpp">
+    <ClInclude Include="Manifold\Font\Font.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

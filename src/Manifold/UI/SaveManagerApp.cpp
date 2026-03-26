@@ -10,6 +10,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <algorithm>
+
 
 #include <windows.h>
 #include <shellapi.h>
@@ -69,6 +71,43 @@ namespace manifold
         {
         }
 
+        enum class AppTheme
+        {
+            RetroConsoleTeal = 0,
+            RetroConsoleRed
+        };
+
+        AppTheme CurrentTheme = AppTheme::RetroConsoleTeal;
+        AppTheme AppliedTheme = static_cast<AppTheme>(-1);
+
+        struct ThemePalette
+        {
+            ImVec4 Accent;
+            ImVec4 AccentHover;
+            ImVec4 AccentSoft;
+            ImVec4 AccentStrong;
+            ImVec4 HeaderTop;
+            ImVec4 HeaderBottom;
+            ImVec4 FooterBg;
+            ImVec4 WindowBg;
+            ImVec4 Border;
+            ImVec4 Text;
+            ImVec4 TextDim;
+            ImVec4 Gold;
+            ImVec4 Button;
+            ImVec4 ButtonHovered;
+            ImVec4 ButtonActive;
+            ImVec4 TitleBg;
+            ImVec4 TitleBgActive;
+            ImVec4 OverlayA;
+            ImVec4 OverlayB;
+            ImVec4 OverlayC;
+            ImVec4 OverlayD;
+            ImVec4 OverlayBorder;
+        };
+
+        ThemePalette ActivePalette{};
+
         HWND MainWindow = nullptr;
         SaveManager SaveManager;
 
@@ -109,6 +148,21 @@ namespace manifold
         void DrawRootWindow();
         void InitializeDefaultDockLayout(ImGuiID dockspaceId);
         void DrawMainMenuBar();
+        void DrawHeaderBar();
+        void SetTealPalette();
+        void SetRedPalette();
+        void ApplyRetroConsoleTheme();
+        void ApplyRetroConsoleRedTheme();
+        void ApplyCurrentThemeIfNeeded();
+        bool BeginRetroWindow(const char* name, bool* pOpen = nullptr, ImGuiWindowFlags flags = 0);
+        void EndRetroWindow();
+        void DrawRetroScreenOverlay();
+        void DrawRetroBottomBar();
+        void DrawRetroPanelLabel(const char* text);
+        bool RetroButton(const char* label, const ImVec2& size = ImVec2(0.0f, 0.0f));
+
+        static constexpr float HeaderBarHeight = 40.0f;
+        static constexpr float FooterBarHeight = 28.0f;
 
         void DrawNavigatorWindow();
         void DrawDeleteGamePopup();
@@ -156,7 +210,7 @@ namespace manifold
     SaveManagerApp::SaveManagerApp(HWND hwnd) : m_Impl(std::make_unique<Impl>(hwnd))
     {
         m_Impl->LoadManifoldFonts();
-        ApplyManifoldTheme();
+        m_Impl->ApplyCurrentThemeIfNeeded();
 
         m_Impl->SaveManager.Load();
         m_Impl->LoadSelectedIntoEditor();
@@ -205,11 +259,495 @@ namespace manifold
         return ImVec4(0.18f, 0.74f, 0.82f, 1.0f);
     }
 
+    void SaveManagerApp::Impl::SetTealPalette()
+    {
+        ActivePalette.Accent        = ImVec4(0.35f, 0.95f, 0.78f, 1.0f);
+        ActivePalette.AccentHover   = ImVec4(0.30f, 0.86f, 0.73f, 1.0f);
+        ActivePalette.AccentSoft    = ImVec4(0.10f, 0.45f, 0.53f, 1.0f);
+        ActivePalette.AccentStrong  = ImVec4(0.18f, 0.59f, 0.66f, 1.0f);
+        ActivePalette.HeaderTop     = ImVec4(0.04f, 0.16f, 0.19f, 0.98f);
+        ActivePalette.HeaderBottom  = ImVec4(0.05f, 0.10f, 0.18f, 0.98f);
+        ActivePalette.FooterBg      = ImVec4(0.03f, 0.18f, 0.21f, 0.95f);
+        ActivePalette.WindowBg      = ImVec4(0.08f, 0.09f, 0.16f, 0.98f);
+        ActivePalette.Border        = ImVec4(0.35f, 0.95f, 0.78f, 1.0f);
+        ActivePalette.Text          = ImVec4(0.91f, 0.95f, 0.78f, 1.0f);
+        ActivePalette.TextDim       = ImVec4(0.58f, 0.66f, 0.54f, 1.0f);
+        ActivePalette.Gold          = ImVec4(0.97f, 0.87f, 0.35f, 1.0f);
+        ActivePalette.Button        = ImVec4(0.14f, 0.17f, 0.28f, 1.0f);
+        ActivePalette.ButtonHovered = ImVec4(0.21f, 0.24f, 0.42f, 1.0f);
+        ActivePalette.ButtonActive  = ImVec4(0.10f, 0.45f, 0.53f, 1.0f);
+        ActivePalette.TitleBg       = ImVec4(0.06f, 0.30f, 0.35f, 1.0f);
+        ActivePalette.TitleBgActive = ImVec4(0.10f, 0.54f, 0.58f, 1.0f);
+        ActivePalette.OverlayA      = ImVec4(0.02f, 0.03f, 0.08f, 0.16f);
+        ActivePalette.OverlayB      = ImVec4(0.02f, 0.05f, 0.10f, 0.06f);
+        ActivePalette.OverlayC      = ImVec4(0.00f, 0.00f, 0.00f, 0.12f);
+        ActivePalette.OverlayD      = ImVec4(0.00f, 0.04f, 0.08f, 0.10f);
+        ActivePalette.OverlayBorder = ImVec4(0.35f, 0.95f, 0.78f, 0.35f);
+    }
+
+    void SaveManagerApp::Impl::SetRedPalette()
+    {
+        ActivePalette.Accent        = ImVec4(0.90f, 0.22f, 0.28f, 1.0f);
+        ActivePalette.AccentHover   = ImVec4(0.96f, 0.34f, 0.38f, 1.0f);
+        ActivePalette.AccentSoft    = ImVec4(0.50f, 0.12f, 0.16f, 1.0f);
+        ActivePalette.AccentStrong  = ImVec4(0.66f, 0.17f, 0.21f, 1.0f);
+        ActivePalette.HeaderTop     = ImVec4(0.20f, 0.07f, 0.09f, 0.98f);
+        ActivePalette.HeaderBottom  = ImVec4(0.12f, 0.06f, 0.10f, 0.98f);
+        ActivePalette.FooterBg      = ImVec4(0.16f, 0.06f, 0.09f, 0.95f);
+        ActivePalette.WindowBg      = ImVec4(0.08f, 0.07f, 0.10f, 0.98f);
+        ActivePalette.Border        = ImVec4(0.90f, 0.22f, 0.28f, 1.0f);
+        ActivePalette.Text          = ImVec4(0.94f, 0.92f, 0.90f, 1.0f);
+        ActivePalette.TextDim       = ImVec4(0.63f, 0.56f, 0.56f, 1.0f);
+        ActivePalette.Gold          = ImVec4(0.97f, 0.87f, 0.35f, 1.0f);
+        ActivePalette.Button        = ImVec4(0.24f, 0.11f, 0.16f, 1.0f);
+        ActivePalette.ButtonHovered = ImVec4(0.33f, 0.14f, 0.20f, 1.0f);
+        ActivePalette.ButtonActive  = ImVec4(0.50f, 0.12f, 0.16f, 1.0f);
+        ActivePalette.TitleBg       = ImVec4(0.30f, 0.07f, 0.10f, 1.0f);
+        ActivePalette.TitleBgActive = ImVec4(0.56f, 0.11f, 0.16f, 1.0f);
+        ActivePalette.OverlayA      = ImVec4(0.08f, 0.02f, 0.03f, 0.16f);
+        ActivePalette.OverlayB      = ImVec4(0.10f, 0.02f, 0.03f, 0.06f);
+        ActivePalette.OverlayC      = ImVec4(0.00f, 0.00f, 0.00f, 0.12f);
+        ActivePalette.OverlayD      = ImVec4(0.08f, 0.01f, 0.02f, 0.10f);
+        ActivePalette.OverlayBorder = ImVec4(0.90f, 0.22f, 0.28f, 0.35f);
+    }
+
+    void SaveManagerApp::Impl::ApplyRetroConsoleTheme()
+    {
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.WindowRounding = 0.0f;
+        style.ChildRounding = 0.0f;
+        style.FrameRounding = 0.0f;
+        style.PopupRounding = 0.0f;
+        style.TabRounding = 0.0f;
+        style.GrabRounding = 0.0f;
+        style.ScrollbarRounding = 0.0f;
+        style.WindowBorderSize = 2.0f;
+        style.ChildBorderSize = 2.0f;
+        style.FrameBorderSize = 2.0f;
+        style.PopupBorderSize = 2.0f;
+        style.TabBorderSize = 2.0f;
+        style.WindowPadding = ImVec2(10.0f, 10.0f);
+        style.FramePadding = ImVec2(8.0f, 6.0f);
+        style.ItemSpacing = ImVec2(8.0f, 6.0f);
+        style.ItemInnerSpacing = ImVec2(6.0f, 4.0f);
+        style.CellPadding = ImVec2(8.0f, 6.0f);
+        style.IndentSpacing = 16.0f;
+        style.ScrollbarSize = 14.0f;
+        style.GrabMinSize = 12.0f;
+
+        ImVec4* c = style.Colors;
+        c[ImGuiCol_Text] = ImVec4(0.91f, 0.95f, 0.78f, 1.0f);
+        c[ImGuiCol_TextDisabled] = ImVec4(0.58f, 0.66f, 0.54f, 1.0f);
+        c[ImGuiCol_WindowBg] = ImVec4(0.08f, 0.09f, 0.16f, 1.0f);
+        c[ImGuiCol_ChildBg] = ImVec4(0.10f, 0.11f, 0.18f, 1.0f);
+        c[ImGuiCol_PopupBg] = ImVec4(0.09f, 0.10f, 0.16f, 1.0f);
+        c[ImGuiCol_Border] = ImVec4(0.35f, 0.95f, 0.78f, 1.0f);
+        c[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.0f);
+        c[ImGuiCol_FrameBg] = ImVec4(0.12f, 0.13f, 0.23f, 1.0f);
+        c[ImGuiCol_FrameBgHovered] = ImVec4(0.17f, 0.18f, 0.30f, 1.0f);
+        c[ImGuiCol_FrameBgActive] = ImVec4(0.22f, 0.23f, 0.38f, 1.0f);
+        c[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.35f, 0.42f, 1.0f);
+        c[ImGuiCol_TitleBgActive] = ImVec4(0.10f, 0.50f, 0.55f, 1.0f);
+        c[ImGuiCol_TitleBgCollapsed] = ImVec4(0.08f, 0.24f, 0.28f, 1.0f);
+        c[ImGuiCol_MenuBarBg] = ImVec4(0.07f, 0.21f, 0.28f, 1.0f);
+        c[ImGuiCol_ScrollbarBg] = ImVec4(0.06f, 0.07f, 0.12f, 1.0f);
+        c[ImGuiCol_ScrollbarGrab] = ImVec4(0.22f, 0.76f, 0.67f, 1.0f);
+        c[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.30f, 0.86f, 0.73f, 1.0f);
+        c[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.36f, 0.95f, 0.80f, 1.0f);
+        c[ImGuiCol_CheckMark] = ImVec4(0.97f, 0.87f, 0.35f, 1.0f);
+        c[ImGuiCol_SliderGrab] = ImVec4(0.97f, 0.87f, 0.35f, 1.0f);
+        c[ImGuiCol_SliderGrabActive] = ImVec4(1.00f, 0.94f, 0.48f, 1.0f);
+        c[ImGuiCol_Button] = ImVec4(0.16f, 0.18f, 0.33f, 1.0f);
+        c[ImGuiCol_ButtonHovered] = ImVec4(0.21f, 0.24f, 0.42f, 1.0f);
+        c[ImGuiCol_ButtonActive] = ImVec4(0.27f, 0.30f, 0.50f, 1.0f);
+        c[ImGuiCol_Header] = ImVec4(0.12f, 0.38f, 0.45f, 1.0f);
+        c[ImGuiCol_HeaderHovered] = ImVec4(0.16f, 0.50f, 0.58f, 1.0f);
+        c[ImGuiCol_HeaderActive] = ImVec4(0.18f, 0.59f, 0.66f, 1.0f);
+        c[ImGuiCol_Separator] = ImVec4(0.35f, 0.95f, 0.78f, 1.0f);
+        c[ImGuiCol_ResizeGrip] = ImVec4(0.35f, 0.95f, 0.78f, 0.35f);
+        c[ImGuiCol_ResizeGripHovered] = ImVec4(0.35f, 0.95f, 0.78f, 0.7f);
+        c[ImGuiCol_ResizeGripActive] = ImVec4(0.35f, 0.95f, 0.78f, 1.0f);
+        c[ImGuiCol_Tab] = ImVec4(0.14f, 0.17f, 0.28f, 1.0f);
+        c[ImGuiCol_TabHovered] = ImVec4(0.18f, 0.23f, 0.37f, 1.0f);
+        c[ImGuiCol_TabActive] = ImVec4(0.10f, 0.45f, 0.53f, 1.0f);
+        c[ImGuiCol_TabUnfocused] = ImVec4(0.10f, 0.12f, 0.22f, 1.0f);
+        c[ImGuiCol_TabUnfocusedActive] = ImVec4(0.12f, 0.25f, 0.31f, 1.0f);
+        c[ImGuiCol_TableHeaderBg] = ImVec4(0.09f, 0.24f, 0.31f, 1.0f);
+        c[ImGuiCol_TableBorderStrong] = ImVec4(0.35f, 0.95f, 0.78f, 1.0f);
+        c[ImGuiCol_TableBorderLight] = ImVec4(0.17f, 0.34f, 0.31f, 1.0f);
+        c[ImGuiCol_TableRowBg] = ImVec4(0.10f, 0.11f, 0.18f, 0.95f);
+        c[ImGuiCol_TableRowBgAlt] = ImVec4(0.12f, 0.13f, 0.22f, 0.95f);
+        c[ImGuiCol_TextSelectedBg] = ImVec4(0.18f, 0.50f, 0.58f, 0.45f);
+        c[ImGuiCol_NavHighlight] = ImVec4(0.97f, 0.87f, 0.35f, 1.0f);
+    }
+
+    bool SaveManagerApp::Impl::BeginRetroWindow(const char* name, bool* pOpen, ImGuiWindowFlags flags)
+    {
+        ImGui::PushStyleColor(ImGuiCol_TitleBg, ActivePalette.TitleBg);
+        ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ActivePalette.TitleBgActive);
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ActivePalette.WindowBg);
+        ImGui::PushStyleColor(ImGuiCol_Border, ActivePalette.Border);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
+        return ImGui::Begin(name, pOpen, flags);
+    }
+
+    void SaveManagerApp::Impl::ApplyRetroConsoleRedTheme()
+    {
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.WindowRounding = 0.0f;
+        style.ChildRounding = 0.0f;
+        style.FrameRounding = 0.0f;
+        style.PopupRounding = 0.0f;
+        style.TabRounding = 0.0f;
+        style.GrabRounding = 0.0f;
+        style.ScrollbarRounding = 0.0f;
+        style.WindowBorderSize = 2.0f;
+        style.ChildBorderSize = 2.0f;
+        style.FrameBorderSize = 2.0f;
+        style.PopupBorderSize = 2.0f;
+        style.TabBorderSize = 2.0f;
+        style.WindowPadding = ImVec2(10.0f, 10.0f);
+        style.FramePadding = ImVec2(8.0f, 6.0f);
+        style.ItemSpacing = ImVec2(8.0f, 6.0f);
+        style.ItemInnerSpacing = ImVec2(6.0f, 4.0f);
+        style.CellPadding = ImVec2(8.0f, 6.0f);
+        style.IndentSpacing = 16.0f;
+        style.ScrollbarSize = 14.0f;
+        style.GrabMinSize = 12.0f;
+
+        ImVec4* c = style.Colors;
+        c[ImGuiCol_Text] = ImVec4(0.94f, 0.92f, 0.90f, 1.0f);
+        c[ImGuiCol_TextDisabled] = ImVec4(0.63f, 0.56f, 0.56f, 1.0f);
+        c[ImGuiCol_WindowBg] = ImVec4(0.08f, 0.07f, 0.10f, 1.0f);
+        c[ImGuiCol_ChildBg] = ImVec4(0.10f, 0.08f, 0.12f, 1.0f);
+        c[ImGuiCol_PopupBg] = ImVec4(0.09f, 0.08f, 0.11f, 1.0f);
+        c[ImGuiCol_Border] = ImVec4(0.90f, 0.22f, 0.28f, 1.0f);
+        c[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.0f);
+        c[ImGuiCol_FrameBg] = ImVec4(0.15f, 0.10f, 0.14f, 1.0f);
+        c[ImGuiCol_FrameBgHovered] = ImVec4(0.22f, 0.13f, 0.18f, 1.0f);
+        c[ImGuiCol_FrameBgActive] = ImVec4(0.30f, 0.16f, 0.22f, 1.0f);
+        c[ImGuiCol_TitleBg] = ImVec4(0.36f, 0.08f, 0.11f, 1.0f);
+        c[ImGuiCol_TitleBgActive] = ImVec4(0.56f, 0.11f, 0.16f, 1.0f);
+        c[ImGuiCol_TitleBgCollapsed] = ImVec4(0.24f, 0.07f, 0.10f, 1.0f);
+        c[ImGuiCol_MenuBarBg] = ImVec4(0.22f, 0.08f, 0.11f, 1.0f);
+        c[ImGuiCol_ScrollbarBg] = ImVec4(0.06f, 0.05f, 0.08f, 1.0f);
+        c[ImGuiCol_ScrollbarGrab] = ImVec4(0.76f, 0.20f, 0.24f, 1.0f);
+        c[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.88f, 0.27f, 0.31f, 1.0f);
+        c[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.96f, 0.34f, 0.38f, 1.0f);
+        c[ImGuiCol_CheckMark] = ImVec4(0.97f, 0.87f, 0.35f, 1.0f);
+        c[ImGuiCol_SliderGrab] = ImVec4(0.97f, 0.87f, 0.35f, 1.0f);
+        c[ImGuiCol_SliderGrabActive] = ImVec4(1.00f, 0.94f, 0.48f, 1.0f);
+        c[ImGuiCol_Button] = ImVec4(0.24f, 0.11f, 0.16f, 1.0f);
+        c[ImGuiCol_ButtonHovered] = ImVec4(0.33f, 0.14f, 0.20f, 1.0f);
+        c[ImGuiCol_ButtonActive] = ImVec4(0.43f, 0.17f, 0.24f, 1.0f);
+        c[ImGuiCol_Header] = ImVec4(0.40f, 0.10f, 0.14f, 1.0f);
+        c[ImGuiCol_HeaderHovered] = ImVec4(0.54f, 0.14f, 0.18f, 1.0f);
+        c[ImGuiCol_HeaderActive] = ImVec4(0.66f, 0.17f, 0.21f, 1.0f);
+        c[ImGuiCol_Separator] = ImVec4(0.90f, 0.22f, 0.28f, 1.0f);
+        c[ImGuiCol_ResizeGrip] = ImVec4(0.90f, 0.22f, 0.28f, 0.35f);
+        c[ImGuiCol_ResizeGripHovered] = ImVec4(0.90f, 0.22f, 0.28f, 0.70f);
+        c[ImGuiCol_ResizeGripActive] = ImVec4(0.90f, 0.22f, 0.28f, 1.0f);
+        c[ImGuiCol_Tab] = ImVec4(0.18f, 0.10f, 0.14f, 1.0f);
+        c[ImGuiCol_TabHovered] = ImVec4(0.29f, 0.13f, 0.18f, 1.0f);
+        c[ImGuiCol_TabActive] = ImVec4(0.50f, 0.12f, 0.16f, 1.0f);
+        c[ImGuiCol_TabUnfocused] = ImVec4(0.12f, 0.08f, 0.11f, 1.0f);
+        c[ImGuiCol_TabUnfocusedActive] = ImVec4(0.24f, 0.10f, 0.13f, 1.0f);
+        c[ImGuiCol_TableHeaderBg] = ImVec4(0.26f, 0.08f, 0.11f, 1.0f);
+        c[ImGuiCol_TableBorderStrong] = ImVec4(0.90f, 0.22f, 0.28f, 1.0f);
+        c[ImGuiCol_TableBorderLight] = ImVec4(0.34f, 0.14f, 0.16f, 1.0f);
+        c[ImGuiCol_TableRowBg] = ImVec4(0.10f, 0.08f, 0.12f, 0.95f);
+        c[ImGuiCol_TableRowBgAlt] = ImVec4(0.13f, 0.09f, 0.14f, 0.95f);
+        c[ImGuiCol_TextSelectedBg] = ImVec4(0.66f, 0.17f, 0.21f, 0.40f);
+        c[ImGuiCol_NavHighlight] = ImVec4(0.97f, 0.87f, 0.35f, 1.0f);
+    }
+
+    void SaveManagerApp::Impl::ApplyCurrentThemeIfNeeded()
+    {
+        if (AppliedTheme == CurrentTheme)
+            return;
+
+        switch (CurrentTheme)
+        {
+        case AppTheme::RetroConsoleTeal:
+            SetTealPalette();
+            ApplyRetroConsoleTheme();
+            break;
+
+        case AppTheme::RetroConsoleRed:
+            SetRedPalette();
+            ApplyRetroConsoleRedTheme();
+            break;
+        }
+
+        AppliedTheme = CurrentTheme;
+    }
+
+    void SaveManagerApp::Impl::EndRetroWindow()
+    {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const ImVec2 p0 = ImGui::GetWindowPos();
+        const ImVec2 p1 = ImVec2(p0.x + ImGui::GetWindowWidth(), p0.y + ImGui::GetWindowHeight());
+        dl->AddRect(p0, p1, ImGui::GetColorU32(ActivePalette.Gold), 0.0f, 0, 1.0f);
+        dl->AddRect(ImVec2(p0.x + 3.0f, p0.y + 3.0f), ImVec2(p1.x - 3.0f, p1.y - 3.0f), ImGui::GetColorU32(ActivePalette.AccentSoft), 0.0f, 0, 1.0f);
+        ImGui::End();
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(4);
+    }
+
+    void SaveManagerApp::Impl::DrawRetroBottomBar()
+    {
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        if (!viewport)
+            return;
+
+        ImDrawList* dl = ImGui::GetForegroundDrawList();
+        if (!dl)
+            return;
+
+        const float h = FooterBarHeight;
+        const ImVec2 p0 = ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - h);
+        const ImVec2 p1 = ImVec2(viewport->WorkPos.x + viewport->WorkSize.x, viewport->WorkPos.y + viewport->WorkSize.y);
+
+        dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ActivePalette.FooterBg));
+        dl->AddLine(p0, ImVec2(p1.x, p0.y), ImGui::GetColorU32(ActivePalette.Accent), 2.0f);
+
+        const GameDefinition* game = SaveManager.CurrentGame();
+        const GameProfile* profile = SaveManager.CurrentProfile();
+
+        std::string text = "READY";
+        text += " | GAME: ";
+        text += game ? (game->DisplayName.empty() ? game->Id : game->DisplayName) : "NONE";
+        text += " | PROFILE: ";
+        text += profile ? profile->Name : "NONE";
+        text += " | BACKUPS: ";
+        text += std::to_string(static_cast<int>(SaveManager.Backups().size()));
+
+        dl->AddText(ImVec2(p0.x + 12.0f, p0.y + 7.0f), ImGui::GetColorU32(ActivePalette.Text), text.c_str());
+    }
+
+    void SaveManagerApp::Impl::DrawRetroPanelLabel(const char* text)
+    {
+        // ImGui::Dummy(ImVec2(0.0f, 2.0f));
+        // ImGui::TextColored(ImVec4(0.97f, 0.87f, 0.35f, 1.0f), "%s", text);
+        // ImGui::Separator();
+    }
+
+    void SaveManagerApp::Impl::DrawHeaderBar()
+    {
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        if (!viewport)
+            return;
+
+        ImGui::SetNextWindowPos(viewport->Pos);
+        ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, HeaderBarHeight));
+        ImGui::SetNextWindowViewport(viewport->ID);
+
+        ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoDecoration |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoDocking |
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoScrollWithMouse |
+            ImGuiWindowFlags_NoNavFocus;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
+
+        if (!ImGui::Begin("ManifoldHeaderBar", nullptr, flags))
+        {
+            ImGui::End();
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar(3);
+            return;
+        }
+
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const ImVec2 winPos = ImGui::GetWindowPos();
+        const ImVec2 winSize = ImGui::GetWindowSize();
+        const ImVec2 winEnd(winPos.x + winSize.x, winPos.y + winSize.y);
+
+        const ImU32 bgTop = ImGui::GetColorU32(ActivePalette.HeaderTop);
+        const ImU32 bgBottom = ImGui::GetColorU32(ActivePalette.HeaderBottom);
+        const ImU32 accent = ImGui::GetColorU32(ActivePalette.Accent);
+        const ImU32 titleCol = ImGui::GetColorU32(ActivePalette.Gold);
+        const ImU32 statusCol = ImGui::GetColorU32(ActivePalette.TextDim);
+
+        dl->AddRectFilledMultiColor(winPos, winEnd, bgTop, bgTop, bgBottom, bgBottom);
+        dl->AddLine(ImVec2(winPos.x, winEnd.y - 1.0f), ImVec2(winEnd.x, winEnd.y - 1.0f), accent, 1.0f);
+
+        const float padX = 12.0f;
+        const float padY = 6.0f;
+        const float buttonSize = HeaderBarHeight - padY * 2.0f;
+        const float buttonSpacing = 6.0f;
+
+        const bool isZoomed = MainWindow && IsZoomed(MainWindow) != FALSE;
+        const char* toggleGlyph = isZoomed ? "o" : "[]";
+
+        const float closeX = winSize.x - padX - buttonSize;
+        const float maxX = closeX - buttonSpacing - buttonSize;
+        const float minX = maxX - buttonSpacing - buttonSize;
+
+        auto drawWindowButton = [&](const char* id, const char* glyph, ImVec4 base, ImVec4 hover, float x, auto&& onClick)
+            {
+                ImGui::SetCursorPos(ImVec2(x, padY));
+                ImGui::PushStyleColor(ImGuiCol_Button, base);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hover);
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, hover);
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+
+                if (ImGui::Button(id, ImVec2(buttonSize, buttonSize)))
+                    onClick();
+
+                const ImVec2 b0 = ImGui::GetItemRectMin();
+                const ImVec2 b1 = ImGui::GetItemRectMax();
+                const ImVec2 ts = ImGui::CalcTextSize(glyph);
+
+                dl->AddText(
+                    ImVec2(
+                        b0.x + ((b1.x - b0.x) - ts.x) * 0.5f,
+                        b0.y + ((b1.y - b0.y) - ts.y) * 0.5f - 1.0f
+                    ),
+                    ImGui::GetColorU32(ActivePalette.Text),
+                    glyph
+                );
+
+                ImGui::PopStyleVar(2);
+                ImGui::PopStyleColor(3);
+            };
+
+        drawWindowButton(
+            "##MinimizeWindow", "-",
+            ActivePalette.Button,
+            ActivePalette.ButtonHovered,
+            minX,
+            [&]()
+            {
+                if (MainWindow)
+                    ShowWindow(MainWindow, SW_MINIMIZE);
+            });
+
+        drawWindowButton(
+            "##ToggleMaximizeWindow", toggleGlyph,
+            ActivePalette.Button,
+            ActivePalette.ButtonHovered,
+            maxX,
+            [&]()
+            {
+                if (MainWindow)
+                    ShowWindow(MainWindow, isZoomed ? SW_RESTORE : SW_MAXIMIZE);
+            });
+
+        const ImVec4 closeBase = CurrentTheme == AppTheme::RetroConsoleRed
+            ? ImVec4(0.42f, 0.10f, 0.13f, 1.0f)
+            : ImVec4(0.27f, 0.10f, 0.12f, 1.0f);
+
+        const ImVec4 closeHover = CurrentTheme == AppTheme::RetroConsoleRed
+            ? ImVec4(0.65f, 0.16f, 0.20f, 1.0f)
+            : ImVec4(0.50f, 0.16f, 0.19f, 1.0f);
+
+        drawWindowButton(
+            "##CloseWindow", "x",
+            closeBase,
+            closeHover,
+            closeX,
+            [&]()
+            {
+                if (MainWindow)
+                    PostMessage(MainWindow, WM_CLOSE, 0, 0);
+            });
+
+        const char* title = ICON_FA_SAVE " MANIFOLD SAVE MANAGER";
+        const ImVec2 titleSize = ImGui::CalcTextSize(title);
+        const ImVec2 titlePos(winPos.x + padX, winPos.y + (HeaderBarHeight - titleSize.y) * 0.5f - 1.0f);
+        dl->AddText(titlePos, titleCol, title);
+
+        const char* statusText = "READY";
+        const ImVec2 statusSize = ImGui::CalcTextSize(statusText);
+
+        const float statusRight = minX - 16.0f;
+        const ImVec2 statusPos(statusRight - statusSize.x, winPos.y + (HeaderBarHeight - statusSize.y) * 0.5f);
+
+        dl->AddCircleFilled(
+            ImVec2(statusPos.x - 10.0f, statusPos.y + statusSize.y * 0.5f),
+            3.5f,
+            accent);
+
+        dl->AddText(statusPos, statusCol, statusText);
+
+        const float dragStartX = padX;
+        const float dragEndX = statusPos.x - 24.0f;
+        const float minDragWidth = 60.0f;
+        const float dragWidth = dragEndX - dragStartX;
+
+        if (dragWidth > minDragWidth)
+        {
+            ImGui::SetCursorPos(ImVec2(dragStartX, 0.0f));
+            ImGui::InvisibleButton("##HeaderDragZone", ImVec2(dragWidth, HeaderBarHeight));
+
+            if (ImGui::IsItemHovered())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && MainWindow)
+            {
+                ShowWindow(MainWindow, isZoomed ? SW_RESTORE : SW_MAXIMIZE);
+            }
+            else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && MainWindow)
+            {
+                ReleaseCapture();
+                SendMessage(MainWindow, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+            }
+        }
+
+        ImGui::End();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(3);
+    }
+
+    bool SaveManagerApp::Impl::RetroButton(const char* label, const ImVec2& size)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Button, ActivePalette.Button);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ActivePalette.ButtonHovered);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ActivePalette.ButtonActive);
+        const bool pressed = ImGui::Button(label, size);
+        ImGui::PopStyleColor(3);
+        return pressed;
+    }
+
+    void SaveManagerApp::Impl::DrawRetroScreenOverlay()
+    {
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        if (!viewport) return;
+        ImDrawList* dl = ImGui::GetForegroundDrawList();
+        if (!dl) return;
+        const ImVec2 p0 = viewport->Pos;
+        const ImVec2 p1 = ImVec2(viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y);
+        dl->AddRectFilledMultiColor( p0, p1, ImGui::GetColorU32(ActivePalette.OverlayA), ImGui::GetColorU32(ActivePalette.OverlayB), ImGui::GetColorU32(ActivePalette.OverlayC), ImGui::GetColorU32(ActivePalette.OverlayD));
+        for (float y = p0.y; y < p1.y; y += 4.0f)
+            dl->AddLine(ImVec2(p0.x, y), ImVec2(p1.x, y), ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 0.0f, 0.06f)), 1.0f);
+        dl->AddRect(p0, p1, ImGui::GetColorU32(ActivePalette.OverlayBorder), 0.0f, 0, 2.0f);
+        DrawHeaderBar();
+        DrawRetroBottomBar();
+    }
+
     void SaveManagerApp::Impl::DrawRootWindow()
     {
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->WorkPos);
-        ImGui::SetNextWindowSize(viewport->WorkSize);
+        if (!viewport)
+            return;
+
+        const ImVec2 rootPos = ImVec2(viewport->Pos.x, viewport->Pos.y + HeaderBarHeight);
+        const ImVec2 rootSize = ImVec2(
+            viewport->Size.x,
+            viewport->Size.y - HeaderBarHeight - FooterBarHeight
+        );
+
+        ImGui::SetNextWindowPos(rootPos);
+        ImGui::SetNextWindowSize(rootSize);
         ImGui::SetNextWindowViewport(viewport->ID);
 
         ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
@@ -222,11 +760,15 @@ namespace manifold
         ImGui::Begin("ManifoldRootDockspace", nullptr, hostFlags);
         ImGui::PopStyleVar(3);
 
+        ApplyCurrentThemeIfNeeded();
+
         DrawMainMenuBar();
         ImGuiID dockspaceId = ImGui::GetID("ManifoldDockspace");
         ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoCloseButton);
         InitializeDefaultDockLayout(dockspaceId);
         ImGui::End();
+
+        DrawRetroScreenOverlay();
 
         DrawNavigatorWindow();
         DrawProfilesWindow();
@@ -349,6 +891,23 @@ namespace manifold
             ImGui::MenuItem(ICON_FA_ARCHIVE " Backups", nullptr, &ShowBackups);
             ImGui::MenuItem(ICON_FA_INFO_CIRCLE " Backup Details", nullptr, &ShowBackupDetails);
             ImGui::MenuItem(ICON_FA_STREAM " Activity Log", nullptr, &ShowActivityLog);
+
+            ImGui::Separator();
+
+            if (ImGui::BeginMenu(ICON_FA_PALETTE " Theme"))
+            {
+                const bool tealSelected = CurrentTheme == AppTheme::RetroConsoleTeal;
+                const bool redSelected = CurrentTheme == AppTheme::RetroConsoleRed;
+
+                if (ImGui::MenuItem("Retro Console Teal", nullptr, tealSelected))
+                    CurrentTheme = AppTheme::RetroConsoleTeal;
+
+                if (ImGui::MenuItem("Retro Console Red", nullptr, redSelected))
+                    CurrentTheme = AppTheme::RetroConsoleRed;
+
+                ImGui::EndMenu();
+            }
+
             ImGui::EndMenu();
         }
 
@@ -366,24 +925,29 @@ namespace manifold
     void SaveManagerApp::Impl::DrawNavigatorWindow()
     {
         if (!ShowNavigator) return;
-        ImGui::Begin(ICON_FA_GAMEPAD " Navigator###Navigator", &ShowNavigator);
+        if (!BeginRetroWindow(ICON_FA_GAMEPAD " Navigator###Navigator", &ShowNavigator))
+        {
+            EndRetroWindow();
+            return;
+        }
+        DrawRetroPanelLabel("GAME LIBRARY");
 
         const bool hasGame = SaveManager.CurrentGame() != nullptr;
 
-        if (ImGui::Button(ICON_FA_PLUS "##AddGame"))
+        if (RetroButton(ICON_FA_PLUS "##AddGame"))
             OpenCreateGameModal();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Create game");
 
         ImGui::SameLine();
 
         ImGui::BeginDisabled(!hasGame);
-        if (ImGui::Button(ICON_FA_EDIT "##EditGame"))
+        if (RetroButton(ICON_FA_EDIT "##EditGame"))
             OpenEditGameModal();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Edit selected game");
 
         ImGui::SameLine();
 
-        if (ImGui::Button(ICON_FA_TRASH_ALT "##DeleteGame"))
+        if (RetroButton(ICON_FA_TRASH_ALT "##DeleteGame"))
             OpenDeleteGamePopup = true;
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Delete selected game");
         ImGui::EndDisabled();
@@ -459,7 +1023,7 @@ namespace manifold
 
         DrawDeleteGamePopup();
 
-        ImGui::End();
+        EndRetroWindow();
     }
 
     void SaveManagerApp::Impl::DrawDeleteGamePopup()
@@ -506,13 +1070,18 @@ namespace manifold
     void SaveManagerApp::Impl::DrawProfilesWindow()
     {
         if (!ShowProfiles) return;
-        ImGui::Begin(ICON_FA_USERS " Profiles###Profiles", &ShowProfiles);
+        if (!BeginRetroWindow(ICON_FA_USERS " Profiles###Profiles", &ShowProfiles))
+        {
+            EndRetroWindow();
+            return;
+        }
+        DrawRetroPanelLabel("PROFILE");
 
         GameDefinition* game = SaveManager.CurrentGame();
         if (!game)
         {
             ImGui::TextDisabled("No game selected.");
-            ImGui::End();
+            EndRetroWindow();
             return;
         }
 
@@ -526,7 +1095,7 @@ namespace manifold
             DrawProfileEditorPane();
             ImGui::EndTable();
         }
-        ImGui::End();
+        EndRetroWindow();
     }
 
     void SaveManagerApp::Impl::DrawProfileListPane(GameDefinition& game)
@@ -534,21 +1103,21 @@ namespace manifold
         const bool hasProfile = SaveManager.CurrentProfile() != nullptr;
         const bool canRemove = game.Profiles.size() > 1 && hasProfile;
 
-        if (ImGui::Button(ICON_FA_PLUS "##AddProfile"))
+        if (RetroButton(ICON_FA_PLUS "##AddProfile"))
             OpenCreateProfileModal();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Create profile");
 
         ImGui::SameLine();
 
         ImGui::BeginDisabled(!hasProfile);
-        if (ImGui::Button(ICON_FA_EDIT "##EditProfile"))
+        if (RetroButton(ICON_FA_EDIT "##EditProfile"))
             OpenEditProfileModal();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Edit selected profile");
 
         ImGui::SameLine();
 
         ImGui::BeginDisabled(!canRemove);
-        if (ImGui::Button(ICON_FA_TRASH_ALT "##RemoveProfile"))
+        if (RetroButton(ICON_FA_TRASH_ALT "##RemoveProfile"))
         {
             SaveEditorIntoSelected();
             SaveManager.RemoveCurrentProfile();
@@ -653,7 +1222,7 @@ namespace manifold
             ImGui::EndTabBar();
         }
 
-        if (ImGui::Button("Apply Profile Changes", ImVec2(-1.0f, 0.0f)))
+        if (RetroButton("Apply Profile Changes", ImVec2(-1.0f, 0.0f)))
         {
             SaveEditorIntoSelected();
             const bool ok = SaveManager.SaveConfig();
@@ -664,14 +1233,19 @@ namespace manifold
     void SaveManagerApp::Impl::DrawGameConfigWindow()
     {
         if (!ShowGameConfig) return;
-        ImGui::Begin(ICON_FA_COG " Game Config###Game Config", &ShowGameConfig);
+        if (!BeginRetroWindow(ICON_FA_COG " Game Config###Game Config", &ShowGameConfig))
+        {
+            EndRetroWindow();
+            return;
+        }
+        DrawRetroPanelLabel("SYSTEM CONFIG");
 
         GameDefinition* game = SaveManager.CurrentGame();
         if (!game)
         {
             ImGui::TextDisabled("No game selected.");
-            if (ImGui::Button("Create Game", ImVec2(-1.0f, 0.0f))) OpenCreateGameModal();
-            ImGui::End();
+            if (RetroButton("Create Game", ImVec2(-1.0f, 0.0f))) OpenCreateGameModal();
+            EndRetroWindow();
             return;
         }
 
@@ -683,7 +1257,7 @@ namespace manifold
         ImGui::SetNextItemWidth(-110.0f);
         ImGui::InputText("##SavePath", GameEditor.SavePath.data(), GameEditor.SavePath.size());
         ImGui::SameLine();
-        if (ImGui::Button("Browse", ImVec2(100.0f, 0.0f)))
+        if (RetroButton("Browse", ImVec2(100.0f, 0.0f)))
             if (auto folder = PickFolderDialog(MainWindow, L"Select Save Folder")) WriteToBuffer(GameEditor.SavePath, *folder);
 
         ImGui::InputText("Process Name", GameEditor.ProcessName.data(), GameEditor.ProcessName.size());
@@ -695,7 +1269,7 @@ namespace manifold
             game->ScopeMode = static_cast<SaveScopeMode>(scopeIndex);
 
         ImGui::Spacing();
-        if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open Folder", ImVec2(160.0f, 0.0f)))
+        if (RetroButton(ICON_FA_FOLDER_OPEN " Open Folder", ImVec2(160.0f, 0.0f)))
         {
             const bool ok = OpenInExplorer(GameEditor.SavePath.data());
             AddLog(ok ? "Save path opened." : "Save path could not be opened.", ok ? Accent() : Bad());
@@ -703,7 +1277,7 @@ namespace manifold
 
         ImGui::SameLine();
 
-        if (ImGui::Button(ICON_FA_SAVE " Save Changes", ImVec2(170.0f, 0.0f)))
+        if (RetroButton(ICON_FA_SAVE " Save Changes", ImVec2(170.0f, 0.0f)))
         {
             SaveEditorIntoSelected();
             const bool ok = SaveManager.SaveConfig();
@@ -712,14 +1286,19 @@ namespace manifold
 
         ImGui::Separator();
         ImGui::BulletText("Save Path: %s", DirectoryExists(GameEditor.SavePath.data()) ? "OK" : "Missing");
-        ImGui::End();
+        EndRetroWindow();
     }
 
     void SaveManagerApp::Impl::DrawScopeRulesWindow()
     {
         if (!ShowScopeRules) return;
 
-        ImGui::Begin(ICON_FA_FILTER " Scope Rules###Scope Rules", &ShowScopeRules);
+        if (!BeginRetroWindow(ICON_FA_FILTER " Scope Rules###Scope Rules", &ShowScopeRules))
+        {
+            EndRetroWindow();
+            return;
+        }
+        DrawRetroPanelLabel("SAVE SCOPE ROUTING");
 
         GameDefinition* game = SaveManager.CurrentGame();
         if (!game)
@@ -727,7 +1306,7 @@ namespace manifold
             ImGui::TextDisabled("No game selected.");
             ImGui::Separator();
             ImGui::TextDisabled("Select a game to manage whitelist and folder rules.");
-            ImGui::End();
+            EndRetroWindow();
             return;
         }
 
@@ -754,7 +1333,7 @@ namespace manifold
 
         ImGui::SameLine();
 
-        if (ImGui::Button(ICON_FA_PLUS " Add", ImVec2(90.0f, 0.0f)))
+        if (RetroButton(ICON_FA_PLUS " Add", ImVec2(90.0f, 0.0f)))
         {
             const std::string value = Trim(ProfileEditor.ScopeRule.data());
             if (!value.empty())
@@ -797,7 +1376,7 @@ namespace manifold
         ImGui::Text("(%d)", static_cast<int>(game->FolderRules.size()));
         DrawScopeRuleTable(game->FolderRules, "FolderRuleTable", 0.0f);
 
-        ImGui::End();
+        EndRetroWindow();
     }
 
     void SaveManagerApp::Impl::DrawScopeRuleTable(std::vector<ScopeRule>& rules, const char* id, float height)
@@ -833,7 +1412,12 @@ namespace manifold
     void SaveManagerApp::Impl::DrawBackupsWindow()
     {
         if (!ShowBackups) return;
-        ImGui::Begin(ICON_FA_ARCHIVE " Backups###Backups", &ShowBackups);
+        if (!BeginRetroWindow(ICON_FA_ARCHIVE " Backups###Backups", &ShowBackups))
+        {
+            EndRetroWindow();
+            return;
+        }
+        DrawRetroPanelLabel("ARCHIVE SLOTS");
         ImGui::Checkbox("Clear target before restore", &ClearBeforeRestore);
         ImGui::Checkbox("Auto backup before overwrite / restore", &BackupBeforeOverwrite);
 
@@ -860,14 +1444,19 @@ namespace manifold
             }
             ImGui::EndTable();
         }
-        ImGui::End();
+        EndRetroWindow();
     }
 
     void SaveManagerApp::Impl::DrawBackupDetailsWindow()
     {
         if (!ShowBackupDetails) return;
 
-        ImGui::Begin(ICON_FA_INFO_CIRCLE " Backup Details###Backup Details", &ShowBackupDetails);
+        if (!BeginRetroWindow(ICON_FA_INFO_CIRCLE " Backup Details###Backup Details", &ShowBackupDetails))
+        {
+            EndRetroWindow();
+            return;
+        }
+        DrawRetroPanelLabel("SLOT INSPECTOR");
 
         const BackupEntry* backup = SaveManager.CurrentBackup();
         if (!backup)
@@ -875,7 +1464,7 @@ namespace manifold
             ImGui::TextDisabled("No backup selected.");
             ImGui::Separator();
             ImGui::TextDisabled("Select a backup from the Backups window to inspect its details.");
-            ImGui::End();
+            EndRetroWindow();
             return;
         }
 
@@ -937,7 +1526,7 @@ namespace manifold
         if (backup->PreviewFiles.empty())
         {
             ImGui::TextDisabled("No preview files available for this backup.");
-            ImGui::End();
+            EndRetroWindow();
             return;
         }
 
@@ -961,21 +1550,21 @@ namespace manifold
             ImGui::EndTable();
         }
 
-        ImGui::End();
+        EndRetroWindow();
     }
 
     void SaveManagerApp::Impl::DrawBackupActionButtons(const BackupEntry& backup)
     {
         const float buttonWidth = 120.0f;
 
-        if (ImGui::Button(ICON_FA_UNDO " Restore", ImVec2(buttonWidth, 0.0f)))
+        if (RetroButton(ICON_FA_UNDO " Restore", ImVec2(buttonWidth, 0.0f)))
             OpenRestoreModal = true;
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Restore the selected backup");
 
         ImGui::SameLine();
 
-        if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open", ImVec2(buttonWidth, 0.0f)))
+        if (RetroButton(ICON_FA_FOLDER_OPEN " Open", ImVec2(buttonWidth, 0.0f)))
         {
             const bool ok = OpenInExplorer(backup.FullPath);
             AddLog(ok ? "Backup opened." : "Backup could not be opened.", ok ? Accent() : Bad());
@@ -985,7 +1574,7 @@ namespace manifold
 
         ImGui::SameLine();
 
-        if (ImGui::Button(ICON_FA_TRASH_ALT " Delete", ImVec2(buttonWidth, 0.0f)))
+        if (RetroButton(ICON_FA_TRASH_ALT " Delete", ImVec2(buttonWidth, 0.0f)))
             ImGui::OpenPopup("DeleteBackupConfirm");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Delete the selected backup");
@@ -994,9 +1583,14 @@ namespace manifold
     void SaveManagerApp::Impl::DrawActivityWindow()
     {
         if (!ShowActivityLog) return;
-        ImGui::Begin(ICON_FA_STREAM " Activity Log###Activity Log", &ShowActivityLog);
+        if (!BeginRetroWindow(ICON_FA_STREAM " Activity Log###Activity Log", &ShowActivityLog))
+        {
+            EndRetroWindow();
+            return;
+        }
+        DrawRetroPanelLabel("SYSTEM FEED");
         for (const auto& entry : Log) ImGui::TextColored(entry.Color, "%s", entry.Message.c_str());
-        ImGui::End();
+        EndRetroWindow();
     }
 
     void SaveManagerApp::Impl::OpenCreateGameModal()

@@ -1,4 +1,5 @@
 ﻿#include <windows.h>
+#include <windowsx.h>
 #include <tchar.h>
 
 #include "ImGui/imgui.h"
@@ -21,23 +22,102 @@ static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
     switch (msg)
     {
-    case WM_SIZE:
-        if (g_D3DHost.Device() != nullptr && wParam != SIZE_MINIMIZED)
-            g_D3DHost.QueueResize(static_cast<UINT>(LOWORD(lParam)), static_cast<UINT>(HIWORD(lParam)));
-        return 0;
-    case WM_SYSCOMMAND:
-        if ((wParam & 0xfff0) == SC_KEYMENU) return 0;
+    case WM_NCCALCSIZE:
+    {
+        if (wParam == TRUE)
+            return 0;
         break;
+    }
+
+    case WM_GETMINMAXINFO:
+    {
+        MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(lParam);
+        if (!mmi)
+            break;
+
+        HMONITOR monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+        if (monitor)
+        {
+            MONITORINFO mi{};
+            mi.cbSize = sizeof(mi);
+
+            if (GetMonitorInfoW(monitor, &mi))
+            {
+                const RECT& work = mi.rcWork;
+                const RECT& monitorRect = mi.rcMonitor;
+
+                mmi->ptMaxPosition.x = work.left - monitorRect.left;
+                mmi->ptMaxPosition.y = work.top - monitorRect.top;
+                mmi->ptMaxSize.x = work.right - work.left;
+                mmi->ptMaxSize.y = work.bottom - work.top;
+                mmi->ptMaxTrackSize.x = mmi->ptMaxSize.x;
+                mmi->ptMaxTrackSize.y = mmi->ptMaxSize.y;
+            }
+        }
+        return 0;
+    }
+
+    case WM_NCHITTEST:
+    {
+        LRESULT hit = DefWindowProcW(hWnd, msg, wParam, lParam);
+        if (hit != HTCLIENT)
+            return hit;
+
+        RECT rc{};
+        GetWindowRect(hWnd, &rc);
+
+        const POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+        const int border = 8;
+
+        const bool left = pt.x >= rc.left && pt.x < rc.left + border;
+        const bool right = pt.x < rc.right && pt.x >= rc.right - border;
+        const bool top = pt.y >= rc.top && pt.y < rc.top + border;
+        const bool bottom = pt.y < rc.bottom && pt.y >= rc.bottom - border;
+
+        if (top && left) return HTTOPLEFT;
+        if (top && right) return HTTOPRIGHT;
+        if (bottom && left) return HTBOTTOMLEFT;
+        if (bottom && right) return HTBOTTOMRIGHT;
+        if (left) return HTLEFT;
+        if (right) return HTRIGHT;
+        if (top) return HTTOP;
+        if (bottom) return HTBOTTOM;
+
+        return HTCLIENT;
+    }
+
+    case WM_SIZE:
+    {
+        if (g_D3DHost.Device() != nullptr && wParam != SIZE_MINIMIZED)
+        {
+            g_D3DHost.QueueResize(
+                static_cast<UINT>(LOWORD(lParam)),
+                static_cast<UINT>(HIWORD(lParam))
+            );
+        }
+        return 0;
+    }
+
+    case WM_SYSCOMMAND:
+    {
+        if ((wParam & 0xfff0) == SC_KEYMENU)
+            return 0;
+        break;
+    }
+
     case WM_DESTROY:
+    {
         PostQuitMessage(0);
         return 0;
     }
+    }
+
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(wc);
@@ -47,7 +127,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
     wc.lpszClassName = L"ManifoldSaveManagerWindowClass";
     RegisterClassExW(&wc);
 
-    HWND hwnd = CreateWindowW(wc.lpszClassName, L"Manifold Save Manager", WS_OVERLAPPEDWINDOW,
+    DWORD style = WS_POPUP | WS_MINIMIZE | WS_MAXIMIZE;
+    DWORD exStyle = WS_EX_APPWINDOW;
+
+    HWND hwnd = CreateWindowExW(exStyle, wc.lpszClassName, L"Manifold Save Manager", style,
         100, 100, 1700, 960, nullptr, nullptr, wc.hInstance, nullptr);
 
     if (!g_D3DHost.Create(hwnd))

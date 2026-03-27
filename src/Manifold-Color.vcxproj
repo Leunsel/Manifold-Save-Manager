@@ -143,7 +143,10 @@
     <ClCompile Include="Manifold\Core\Utils.cpp" />
     <ClCompile Include="Manifold\Platform\D3D11Host.cpp" />
     <ClCompile Include="Manifold\UI\SaveManagerApp.cpp" />
-    <ClCompile Include="Manifold\UI\Theme.cpp" />
+    <ClCompile Include="Manifold\UI\SaveManagerApp.Layout.cpp" />
+    <ClCompile Include="Manifold\UI\SaveManagerApp.Modals.cpp" />
+    <ClCompile Include="Manifold\UI\SaveManagerApp.Panels.cpp" />
+    <ClCompile Include="Manifold\UI\SaveManagerApp.Theme.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImGui\imconfig.h" />
@@ -162,7 +165,7 @@
     <ClInclude Include="Manifold\Font\Font.hpp" />
     <ClInclude Include="Manifold\Platform\D3D11Host.hpp" />
     <ClInclude Include="Manifold\UI\SaveManagerApp.hpp" />
-    <ClInclude Include="Manifold\UI\Theme.hpp" />
+    <ClInclude Include="Manifold\UI\SaveManagerApp.Internal.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -105,12 +105,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -ExecutionPolicy Bypass -File "$(ProjectDir)Manifold\Misc\GenerateBuildNumber.ps1"</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -129,6 +132,9 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -ExecutionPolicy Bypass -File "$(ProjectDir)Manifold\Misc\GenerateBuildNumber.ps1"</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ImGui\imgui.cpp" />
@@ -141,6 +147,7 @@
     <ClCompile Include="Manifold\Core\Models.cpp" />
     <ClCompile Include="Manifold\Core\SaveManager.cpp" />
     <ClCompile Include="Manifold\Core\Utils.cpp" />
+    <ClCompile Include="Manifold\Misc\Version.cpp" />
     <ClCompile Include="Manifold\Platform\D3D11Host.cpp" />
     <ClCompile Include="Manifold\UI\SaveManagerApp.cpp" />
     <ClCompile Include="Manifold\UI\SaveManagerApp.Layout.cpp" />
@@ -163,9 +170,17 @@
     <ClInclude Include="Manifold\Core\Utils.hpp" />
     <ClInclude Include="Manifold\Font\IconsFontAwesome5.hpp" />
     <ClInclude Include="Manifold\Font\Font.hpp" />
+    <ClInclude Include="Manifold\Misc\BuildNumber.generated.hpp" />
+    <ClInclude Include="Manifold\Misc\Version.hpp" />
     <ClInclude Include="Manifold\Platform\D3D11Host.hpp" />
     <ClInclude Include="Manifold\UI\SaveManagerApp.hpp" />
     <ClInclude Include="Manifold\UI\SaveManagerApp.Internal.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Manifold\Misc\GenerateBuildNumber.ps1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Manifold\Misc\build_number.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

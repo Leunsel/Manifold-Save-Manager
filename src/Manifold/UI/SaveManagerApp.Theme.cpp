@@ -341,8 +341,8 @@ namespace manifold
         drawWindowButton("##ToggleMaximizeWindow", toggleGlyph, Theme.Active.Button, Theme.Active.ButtonHovered, maxX, [&]() { if (MainWindow) ShowWindow(MainWindow, isZoomed ? SW_RESTORE : SW_MAXIMIZE); });
         drawWindowButton("##CloseWindow", "x", ImVec4(0.27f, 0.10f, 0.12f, 1.0f), ImVec4(0.50f, 0.16f, 0.19f, 1.0f), closeX, [&]() { if (MainWindow) PostMessage(MainWindow, WM_CLOSE, 0, 0); });
 
-        const char* title = ICON_FA_SAVE " MANIFOLD SAVE MANAGER";
-        dl->AddText(ImVec2(winPos.x + padX, winPos.y + (HeaderBarHeight - ImGui::CalcTextSize(title).y) * 0.5f - 1.0f), ImGui::GetColorU32(Theme.Active.Gold), title);
+        std::string title = std::string(ICON_FA_SAVE) + " MANIFOLD SAVE MANAGER " + manifold::version::ToString();
+        dl->AddText(ImVec2(winPos.x + padX, winPos.y + (HeaderBarHeight - ImGui::CalcTextSize(title.c_str()).y) * 0.5f - 1.0f), ImGui::GetColorU32(Theme.Active.Gold), title.c_str());
 
         const char* statusText = "READY";
         const ImVec2 statusSize = ImGui::CalcTextSize(statusText);

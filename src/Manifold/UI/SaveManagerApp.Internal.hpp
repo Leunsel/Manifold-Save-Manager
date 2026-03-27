@@ -16,6 +16,7 @@
 #include "../Core/Math.hpp"
 #include "../Core/SaveManager.hpp"
 #include "../Core/Utils.hpp"
+#include "../Misc/Version.hpp"
 #include "../Font/Font.hpp"
 #include "../Font/IconsFontAwesome5.hpp"
 #include "SaveManagerApp.hpp"

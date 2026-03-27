@@ -80,6 +80,7 @@ namespace manifold
         c[ImGuiCol_TextSelectedBg] = ImVec4(p.Accent.x, p.Accent.y, p.Accent.z, 0.25f);
         c[ImGuiCol_TabSelectedOverline] = p.Accent;
         c[ImGuiCol_NavHighlight] = p.Accent;
+        c[ImGuiCol_ModalWindowDimBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.45f);
     }
 
     void SaveManagerApp::Impl::SetTheme(ThemeRuntime::AppTheme theme)

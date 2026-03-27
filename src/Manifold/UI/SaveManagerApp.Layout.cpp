@@ -44,7 +44,6 @@ namespace manifold
         DrawGameConfigWindow();
         DrawScopeRulesWindow();
         DrawBackupsWindow();
-        DrawBackupDetailsWindow();
         DrawActivityWindow();
 
         DrawGameModal();
@@ -155,7 +154,6 @@ namespace manifold
             ImGui::MenuItem(ICON_FA_COG " Game Config", nullptr, &Panels.GameConfig);
             ImGui::MenuItem(ICON_FA_FILTER " Scope Rules", nullptr, &Panels.ScopeRules);
             ImGui::MenuItem(ICON_FA_ARCHIVE " Backups", nullptr, &Panels.Backups);
-            ImGui::MenuItem(ICON_FA_INFO_CIRCLE " Backup Details", nullptr, &Panels.BackupDetails);
             ImGui::MenuItem(ICON_FA_STREAM " Activity Log", nullptr, &Panels.ActivityLog);
             ImGui::Separator();
 

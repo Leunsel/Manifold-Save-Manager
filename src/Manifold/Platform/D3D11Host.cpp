@@ -39,26 +39,34 @@ namespace manifold
 
     void D3D11Host::CreateRenderTarget()
     {
-        ID3D11Texture2D* pBackBuffer = nullptr;
-        m_SwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-        if (pBackBuffer)
-        {
-            m_Device->CreateRenderTargetView(pBackBuffer, nullptr, &m_MainRenderTargetView);
-            pBackBuffer->Release();
-        }
+        if (!m_SwapChain || !m_Device) return;
+        ID3D11Texture2D* backBuffer = nullptr;
+        const HRESULT hr = m_SwapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
+        if (FAILED(hr) || !backBuffer) return;
+        m_Device->CreateRenderTargetView(backBuffer, nullptr, &m_MainRenderTargetView);
+        backBuffer->Release();
     }
 
     void D3D11Host::HandleResize()
     {
         if (m_ResizeWidth == 0 || m_ResizeHeight == 0) return;
+        if (!m_Device || !m_Context || !m_SwapChain) return;
+        m_Context->OMSetRenderTargets(0, nullptr, nullptr);
+        m_Context->ClearState();
+        m_Context->Flush();
         CleanupRenderTarget();
-        m_SwapChain->ResizeBuffers(0, m_ResizeWidth, m_ResizeHeight, DXGI_FORMAT_UNKNOWN, 0);
-        m_ResizeWidth = m_ResizeHeight = 0;
+        const UINT width = m_ResizeWidth;
+        const UINT height = m_ResizeHeight;
+        m_ResizeWidth = 0;
+        m_ResizeHeight = 0;
+        const HRESULT hr = m_SwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+        if (FAILED(hr)) return;
         CreateRenderTarget();
     }
 
     void D3D11Host::BeginFrame()
     {
+        if (!m_Context || !m_MainRenderTargetView) return;
         const float clearColor[4] = { 0.04f, 0.05f, 0.07f, 1.0f };
         m_Context->OMSetRenderTargets(1, &m_MainRenderTargetView, nullptr);
         m_Context->ClearRenderTargetView(m_MainRenderTargetView, clearColor);

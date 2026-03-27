@@ -8,7 +8,7 @@ namespace manifold::version
         if (IsPrerelease)
         {
             return std::format(
-                "v{}.{}.{}-{}+build.{}",
+                "v{}.{}.{}-{}+BUILD.{}",
                 Major,
                 Minor,
                 Patch,
@@ -17,7 +17,7 @@ namespace manifold::version
         }
 
         return std::format(
-            "v{}.{}.{}+build.{}",
+            "v{}.{}.{}+BUILD.{}",
             Major,
             Minor,
             Patch,

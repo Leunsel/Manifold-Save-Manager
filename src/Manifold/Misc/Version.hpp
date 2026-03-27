@@ -20,7 +20,7 @@ namespace manifold::version
     inline constexpr int Build = MANIFOLD_BUILD_NUMBER;
 
     inline constexpr bool IsPrerelease = true;
-    inline constexpr std::string_view PrereleaseTag = "preview";
+    inline constexpr std::string_view PrereleaseTag = "PREVIEW";
 
     std::string ToString();
     std::string ToDetailedString();
